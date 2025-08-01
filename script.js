@@ -219,6 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 通用處理函數，用於處理 AI 請求
     async function handleAIRequest(button, outputField, apiEndpoint, payload, titlesOutputElement) {
+        // --- 在這裡新增後端網址 ---
+        const backendUrl = 'https://my-news-assistant-backend.onrender.com';
+        const fullUrl = `${backendUrl}${apiEndpoint}`;
+
         button.disabled = true;
         if (outputField.id === 'correctedTextOutput') {
             outputField.innerHTML = '<p style="color: #666;">AI 正在努力生成中，請稍候...</p>';
@@ -231,10 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            console.log(`[Frontend Debug] Sending request to: ${apiEndpoint}`);
+            console.log(`[Frontend Debug] Sending request to: ${fullUrl}`);
             console.log(`[Frontend Debug] Payload:`, payload);
 
-            const response = await fetch(apiEndpoint, {
+            const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
