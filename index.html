@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETtoday AI 新聞小幫手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 確保紅字樣式能被應用 */
+        .red-text {
+            color: red;
+            font-weight: bold;
+        }
+        /* Style for the corrected text display area */
+        .corrected-text-display {
+            min-height: 80px;
+            width: 100%;
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid #d1d5db; /* border-gray-300 */
+            background-color: #f9fafb; /* bg-gray-50 */
+            padding: 0.5rem 0.75rem; /* px-3 py-2 */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.5; /* default line height for readability */
+            overflow-y: auto; /* scroll if content overflows */
+            white-space: pre-wrap; /* preserve whitespace and wrap text */
+            word-wrap: break-word; /* break long words */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module">
+        import React from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+        const { useState, useCallback, useEffect, useRef } = React;
+
+        // Lucide React Icons
+        import { ClipboardCopy, Loader, XCircle, CheckCircle, Info, Lightbulb, Link, Youtube, FileText, Eraser, PenTool, BookOpen, User, ExternalLink } from 'https://esm.sh/lucide-react@0.395.0';
+
+        function classNames(...classes) {
+            return classes.filter(Boolean).join(' ');
+        }
+
+        // Shadcn UI components - Simplified and directly using React.createElement
+        const Button = ({ children, onClick, className, disabled, type = 'button', variant = 'default', size = 'default', asChild = false }) => {
+            let baseClass = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+            if (variant === 'ghost') {
+                baseClass += " hover:bg-accent hover:text-accent-foreground";
+            } else if (variant === 'outline') {
+                baseClass += " border border-input bg-background hover:bg-accent hover:text-accent-foreground";
+            } else if (variant === 'default') {
+                baseClass += " bg-indigo-600 text-white hover:bg-indigo-700";
+            }
+            if (size === 'icon') {
+                baseClass += " h-10 w-10";
+            }
+            const finalClass = classNames(baseClass, className);
+            return React.createElement('button', { onClick, className: finalClass, disabled, type }, children);
+        };
+
+        const Textarea = ({ className, ...props }) => React.createElement('textarea', { className: classNames("flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", className), ...props });
+        const Input = ({ className, ...props }) => React.createElement('input', { className: classNames("flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", className), ...props });
+        const Label = ({ className, ...props }) => React.createElement('label', { className: classNames("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70", className), ...props });
+        
+        const Select = ({ children, value, onValueChange }) => (
+            React.createElement('select', { value: value, onChange: (e) => onValueChange(e.target.value), className: "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" }, children)
+        );
+        const SelectContent = ({ children }) => React.createElement(React.Fragment, null, children);
+        const SelectItem = ({ value, children }) => React.createElement('option', { value: value }, children);
+        const SelectTrigger = ({ children }) => React.createElement(React.Fragment, null, children);
+        const SelectValue = ({ placeholder }) => React.createElement(React.Fragment, null, placeholder);
+
+        const Card = ({ className, ...props }) => React.createElement('div', { className: classNames("rounded-xl border bg-card text-card-foreground shadow", className), ...props });
+        const CardHeader = ({ className, ...props }) => React.createElement('div', { className: classNames("flex flex-col space-y-1.5 p-6", className), ...props });
+        const CardTitle = ({ className, ...props }) => React.createElement('h3', { className: classNames("font-semibold leading-none tracking-tight", className), ...props });
+        const CardDescription = ({ className, ...props }) => React.createElement('p', { className: classNames("text-sm text-muted-foreground", className), ...props });
+        const CardContent = ({ className, ...props }) => React.createElement('div', { className: classNames("p-6 pt-0", className), ...props });
+        const CardFooter = ({ className, ...props }) => React.createElement('div', { className: classNames("flex items-center p-6 pt-0", className), ...props });
+
+        const Tabs = ({ value, onValueChange, children }) => (
+            React.createElement('div', { className: "w-full" },
+                React.Children.map(children, child => {
+                    if (child && child.type === TabsList) {
+                        return React.cloneElement(child, { value, onValueChange });
+                    }
+                    return child;
+                }),
+                React.Children.map(children, child => {
+                    if (child && child.type === TabsContent) {
+                        return React.cloneElement(child, { activeTabValue: value });
+                    }
+                    return null;
+                })
+            )
+        );
+        const TabsList = ({ value, onValueChange, children, className }) => (
+            React.createElement('div', { className: classNames("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground flex-wrap", className) },
+                React.Children.map(children, child =>
+                    child ? React.cloneElement(child, { onValueChange, activeTabValue: value }) : null
+                )
+            )
+        );
+        const TabsTrigger = ({ value, children, onValueChange, activeTabValue, className }) => (
+            React.createElement('button', {
+                className: classNames("inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                    activeTabValue === value ? 'bg-background text-foreground shadow-sm' : '',
+                    className
+                ),
+                onClick: () => onValueChange(value)
+            }, children)
+        );
+        const TabsContent = ({ value, activeTabValue, children, className }) => (
+            React.createElement('div', { className: classNames(activeTabValue === value ? '' : 'hidden', className) }, children)
+        );
+
+        const Slider = ({ min, max, step, value, onValueChange, className }) => (
+            React.createElement('input', {
+                type: "range",
+                min: min,
+                max: max,
+                step: step,
+                value: value[0],
+                onChange: (e) => onValueChange([Number(e.target.value)]),
+                className: classNames("w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700", className)
+            })
+        );
+        const Separator = ({ className, ...props }) => React.createElement('div', { className: classNames("shrink-0 bg-border h-[1px] w-full", className), ...props });
+        const ScrollArea = ({ children, className, ref }) => (
+            React.createElement('div', { ref: ref, className: classNames("relative overflow-auto", className), style: { maxHeight: 'calc(100vh - 300px)' } }, children)
+        );
+        const TooltipProvider = ({ children }) => React.createElement(React.Fragment, null, children);
+        const Tooltip = ({ children }) => React.createElement(React.Fragment, null, children);
+        const TooltipTrigger = ({ children, asChild }) => asChild ? children : React.createElement(React.Fragment, null, children);
+        const TooltipContent = ({ className, ...props }) => React.createElement('div', { className: classNames("z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=fade-out] data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2", className), ...props });
+        const Alert = ({ className, ...props }) => React.createElement('div', { className: classNames("relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&:has(svg)]:pl-10", className), ...props });
+        const AlertTitle = ({ className, ...props }) => React.createElement('h5', { className: "mb-1 font-medium leading-none tracking-tight", ...props });
+        const AlertDescription = ({ className, ...props }) => React.createElement('div', { className: "text-sm [&_p]:leading-relaxed", ...props });
+
+
+        // Utility for copying to clipboard (browser compatibility)
+        const copyToClipboard = (text) => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                return true;
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                return false;
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        };
+
+        // Message Box Component
+        const MessageBox = ({ message, type, onClose }) => {
+            if (!message) return null;
+
+            const Icon = type === 'error' ? XCircle : type === 'success' ? CheckCircle : Info;
+            const alertClass = type === 'error' ? 'border-red-500 text-red-700 bg-red-50' : type === 'success' ? 'border-green-500 text-green-700 bg-green-50' : 'border-blue-500 text-blue-700 bg-blue-50';
+
+            return (
+                React.createElement(Alert, { className: classNames("fixed bottom-4 right-4 w-80 shadow-lg z-50", alertClass) },
+                    React.createElement(Icon, { className: "h-5 w-5" }),
+                    React.createElement(AlertTitle, null, type === 'error' ? '錯誤' : type === 'success' ? '成功' : '資訊'),
+                    React.createElement(AlertDescription, null, message),
+                    React.createElement(Button, { variant: "ghost", size: "sm", onClick: onClose, className: "absolute top-2 right-2" },
+                        React.createElement(XCircle, { className: "h-4 w-4" })
+                    )
+                )
+            );
+        };
+
+        // Loading Spinner Component
+        const LoadingSpinner = () => (
+            React.createElement('div', { className: "flex justify-center items-center py-4" },
+                React.createElement(Loader, { className: "animate-spin h-8 w-8 text-blue-500" })
+            )
+        );
+
+        // Main App Component
+        function App() {
+            // State for UI and functionality
+            const [activeTab, setActiveTab] = useState("rewrite-url");
+            const [url, setUrl] = useState('');
+            const [content, setContent] = useState(''); // For 通稿改寫
+            const [artistName, setArtistName] = useState('');
+            const [platform, setPlatform] = useState('');
+            const [postContent, setPostContent] = useState('');
+            const [mediaDescription, setMediaDescription] = useState('');
+            const [originalLink, setOriginalLink] = useState('');
+            const [remark, setRemark] = useState('');
+            const [youtubeUrl, setYoutubeUrl] = useState('');
+            const [proofreadText, setProofreadText] = useState(''); // Input for proofread
+            const [generatedText, setGeneratedText] = useState(''); // Output for all tabs
+            const [longTitles, setLongTitles] = useState([]);
+            const [shortTitles, setShortTitles] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [message, setMessage] = useState('');
+            const [messageType, setMessageType] = useState('');
+            const [generatedLongTitle, setGeneratedLongTitle] = useState('');
+            const [generatedShortTitle, setGeneratedShortTitle] = useState('');
+            const [generatedNewsContent, setGeneratedNewsContent] = useState('');
+
+
+            // State for Generate News from Visit
+            const [visitContent, setVisitContent] = useState('');
+            const [visitTitle, setVisitTitle] = useState('');
+            const [visitMinLength, setVisitMinLength] = useState(200);
+            const [visitMaxLength, setVisitMaxLength] = useState(500);
+            const [visitNumParagraphs, setVisitNumParagraphs] = useState(3);
+            const [tone, setTone] = useState('neutral');
+
+            // New states for 通稿改寫 word/paragraph count
+            const [draftMinLength, setDraftMinLength] = useState(200);
+            const [draftMaxLength, setDraftMaxLength] = useState(500);
+            const [draftNumParagraphs, setDraftNumParagraphs] = useState(3);
+
+            // Effect to clear generated content when tab changes
+            const handleTabChange = useCallback((newTab) => {
+                setActiveTab(newTab);
+                setGeneratedText(''); // Clear main output
+                setLongTitles([]);
+                setShortTitles([]);
+                setGeneratedLongTitle(''); // Clear YouTube specific outputs
+                setGeneratedShortTitle('');
+                setGeneratedNewsContent('');
+                // For simplicity, we only clear outputs here.
+            }, []);
+
+
+            // Helper to display messages
+            const showMessage = useCallback((msg, type) => {
+                let displayMessage = msg;
+                if (type === 'error' && msg.includes('403 Forbidden')) {
+                    displayMessage = "無法從網址提取內容。該網站可能實施了反爬蟲機制。請嘗試手動複製文章內容，並使用「通稿改寫」功能。";
+                }
+                setMessage(displayMessage);
+                setMessageType(type);
+                const timer = setTimeout(() => {
+                    setMessage('');
+                    setMessageType('');
+                }, 8000); // Message disappears after 8 seconds for errors
+                return () => clearTimeout(timer);
+            }, []);
+
+            // Generic API call handler
+            const callApi = useCallback(async (endpoint, payload) => {
+                setLoading(true);
+                setMessage('');
+                setMessageType('');
+                try {
+                    const baseUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port}`;
+                    
+                    const response = await fetch(`${baseUrl}${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `API 請求失敗: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    showMessage('操作成功！', 'success');
+                    return data;
+                } catch (error) {
+                    console.error(`API 請求錯誤 (${endpoint}):`, error);
+                    showMessage(error.message || '發生未知錯誤，請稍後再試。', 'error');
+                    return null;
+                } finally {
+                    setLoading(false);
+                }
+            }, [showMessage]);
+
+            // Handlers for each tab's functionality
+            const handleRewriteUrl = async () => {
+                setGeneratedText('');
+                setLongTitles([]);
+                setShortTitles([]);
+                const data = await callApi('/rewrite-url', { url });
+                if (data) {
+                    setGeneratedText(data.rewrittenText);
+                    setLongTitles(data.longTitles);
+                    setShortTitles(data.shortTitles);
+                }
+            };
+
+            const handleRewriteNewsDraft = async () => { // Now "通稿改寫"
+                setGeneratedText('');
+                setLongTitles([]);
+                setShortTitles([]);
+                const data = await callApi('/rewrite-news-draft', {
+                    content,
+                    minLength: draftMinLength,
+                    maxLength: draftMaxLength,
+                    numParagraphs: draftNumParagraphs
+                });
+                if (data) {
+                    setGeneratedText(data.rewrittenNewsDraftText);
+                    setLongTitles(data.longTitles);
+                    setShortTitles(data.shortTitles);
+                }
+            };
+
+            const handleTranslateRewrite = async () => {
+                setGeneratedText('');
+                setLongTitles([]);
+                setShortTitles([]);
+                const data = await callApi('/translate-rewrite', { url, sourceLanguage: 'auto' }); // Assuming auto-detect language
+                if (data) {
+                    setGeneratedText(data.translatedRewrittenText);
+                    setLongTitles(data.longTitles);
+                    setShortTitles(data.shortTitles);
+                }
+            };
+
+            const handleGenerateNews = async () => {
+                setGeneratedText('');
+                setLongTitles([]);
+                setShortTitles([]);
+                const data = await callApi('/generate-news', {
+                    content: visitContent,
+                    title: visitTitle,
+                    minLength: visitMinLength,
+                    maxLength: visitMaxLength,
+                    numParagraphs: visitNumParagraphs,
+                    tone
+                });
+                if (data) {
+                    setGeneratedText(data.generatedText);
+                    setLongTitles(data.longTitles);
+                    setShortTitles(data.shortTitles);
+                }
+            };
+
+            const handleCelebritySocialToNews = async () => {
+                setGeneratedText('');
+                setLongTitles([]);
+                setShortTitles([]);
+                const data = await callApi('/celebrity-social-to-news', {
+                    artistName,
+                    platform,
+                    postContent,
+                    mediaDescription,
+                    originalLink,
+                    remark
+                });
+                if (data) {
+                    setGeneratedText(data.celebrityNewsText);
+                    setLongTitles(data.longTitles);
+                    setShortTitles(data.shortTitles);
+                }
+            };
+
+            const handleGenerateNewsFromYoutube = async () => {
+                // Clear previous results
+                setGeneratedLongTitle('');
+                setGeneratedShortTitle('');
+                setGeneratedNewsContent('');
+
+                // Display "開發中請稍待"
+                setGeneratedNewsContent('開發中請稍待');
+                setGeneratedLongTitle('開發中請稍待');
+                setGeneratedShortTitle('開發中請稍待');
+
+                showMessage('此功能正在開發中，請稍後再試。', 'info');
+            };
+
+
+            const handleProofreadText = async () => {
+                setGeneratedText(''); // Clear previous proofread output
+                const data = await callApi('/proofread-text', { text: proofreadText });
+                if (data) {
+                    setGeneratedText(data.correctedText); // correctedText is the string with (訂正) marks
+                }
+            };
+
+            const handleCopyToClipboard = (text) => {
+                if (copyToClipboard(text)) {
+                    showMessage('內容已複製到剪貼簿！', 'success');
+                } else {
+                    showMessage('無法複製到剪貼簿，請手動複製。', 'error');
+                }
+            };
+
+            // Helper function to render corrected text with red highlights
+            const renderCorrectedText = (text) => {
+                console.log("renderCorrectedText called with text:", text);
+                if (!text) {
+                    console.log("Input text is empty or null, returning empty fragment.");
+                    return React.createElement(React.Fragment, null);
+                }
+
+                const parts = [];
+                // Regex to find "原始錯誤詞彙（訂正後的詞彙）" pattern
+                // This regex specifically targets Chinese characters, full-width punctuation, and basic alphanumeric/whitespace for the "original error" and "corrected word" parts.
+                // It captures:
+                // Group 1: The original error word/phrase (e.g., "需藥")
+                // Group 2: The corrected word/phrase (e.g., "需要")
+                const regex = /([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\w\s]+?)\uff08([\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\w\s]+?)\uff09/g;
+                let lastIndex = 0;
+                let match;
+                let keyCounter = 0;
+
+                while ((match = regex.exec(text)) !== null) {
+                    const originalError = match[1];     // e.g., "需藥"
+                    const correctedWord = match[2];     // e.g., "需要"
+                    const fullMatchedPattern = match[0]; // e.g., "需藥（需要）"
+                    
+                    // Add text before the current match
+                    if (match.index > lastIndex) {
+                        parts.push(React.createElement(React.Fragment, { key: `text-before-${keyCounter++}` }, text.substring(lastIndex, match.index)));
+                    }
+
+                    // Add the original error in red
+                    parts.push(
+                        React.createElement('span', { key: `red-error-${keyCounter++}`, className: "red-text" }, originalError)
+                    );
+                    
+                    // Add the corrected word in parenthesis (normal text)
+                    parts.push(
+                        React.createElement(React.Fragment, { key: `corrected-word-${keyCounter++}` }, `（${correctedWord}）`)
+                    );
+
+                    lastIndex = match.index + fullMatchedPattern.length; // Update lastIndex correctly
+                }
+
+                // Add any remaining text after the last match
+                if (lastIndex < text.length) {
+                    parts.push(React.createElement(React.Fragment, { key: `text-after-last-${keyCounter++}` }, text.substring(lastIndex)));
+                }
+
+                // If no matches were found, return the original text as a single fragment
+                if (parts.length === 0) {
+                    console.log("No matches found, returning original text as a single fragment.");
+                    return React.createElement(React.Fragment, { key: `original-full-text` }, text);
+                }
+                console.log("Rendered parts:", parts);
+                return parts;
+            };
+
+
+            return (
+                React.createElement(TooltipProvider, null,
+                    React.createElement('div', { className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 font-inter text-gray-800 flex flex-col items-center" },
+                        React.createElement('h1', { className: "text-4xl font-extrabold text-indigo-800 mb-6 drop-shadow-md" },
+                            React.createElement(Lightbulb, { className: "inline-block mr-3 h-10 w-10 text-yellow-500" }),
+                            "ETtoday AI 新聞小幫手"
+                        ),
+
+                        React.createElement('div', { className: "w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col" },
+                            /* Main Content Area */
+                            React.createElement('div', { className: "flex-1 p-6 lg:p-8" },
+                                React.createElement(Tabs, { value: activeTab, onValueChange: handleTabChange, className: "w-full" },
+                                    React.createElement(TabsList, { className: "grid w-full grid-cols-3 md:grid-cols-6 h-auto flex-wrap" },
+                                        React.createElement(TabsTrigger, { value: "rewrite-url", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(Link, { className: "h-4 w-4 mr-2" }), "網址改寫"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "rewrite-news-draft", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(FileText, { className: "h-4 w-4 mr-2" }), "通稿改寫"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "translate-rewrite", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(BookOpen, { className: "h-4 w-4 mr-2" }), "外電翻譯改寫"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "generate-news", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(PenTool, { className: "h-4 w-4 mr-2" }), "訪問內容生成"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "celebrity-social-to-news", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(User, { className: "h-4 w-4 mr-2" }), "名人社群轉新聞"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "generate-news-from-youtube", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(Youtube, { className: "h-4 w-4 mr-2" }), "YouTube 轉新聞"
+                                        ),
+                                        React.createElement(TabsTrigger, { value: "proofread-text", className: "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100" },
+                                            React.createElement(Eraser, { className: "h-4 w-4 mr-2" }), "錯字校正"
+                                        )
+                                    ),
+
+                                    /* Tab Content: 新聞網址 AI 改寫 */
+                                    React.createElement(TabsContent, { value: "rewrite-url", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "新聞網址 AI 改寫"),
+                                                React.createElement(CardDescription, null, "輸入新聞網址，AI 將自動抓取內容並改寫，生成符合 ETtoday 風格的新聞稿及標題。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "url" }, "新聞網址"),
+                                                    React.createElement(Input, {
+                                                        id: "url",
+                                                        type: "url",
+                                                        placeholder: "https://news.ettoday.net/...",
+                                                        value: url,
+                                                        onChange: (e) => setUrl(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement(Button, { onClick: handleRewriteUrl, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '開始改寫'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "長標題:"),
+                                                            longTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `lt-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "短標題 (20字以內):"),
+                                                            shortTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `st-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, { htmlFor: "generated-text" }, "新聞稿內容:"),
+                                                            React.createElement(Textarea, {
+                                                                id: "generated-text",
+                                                                value: generatedText,
+                                                                readOnly: true,
+                                                                className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                            }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製新聞稿"
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製新聞稿內容")
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: 通稿改寫 (原新聞稿改寫) */
+                                    React.createElement(TabsContent, { value: "rewrite-news-draft", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "通稿改寫"),
+                                                React.createElement(CardDescription, null, "貼上通稿內容，AI 將其重新改寫，並生成新的標題。可自訂字數與段落數。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "content" }, "原始通稿內容"),
+                                                    React.createElement(Textarea, {
+                                                        id: "content",
+                                                        placeholder: "請在此處貼上您要改寫的通稿內容...",
+                                                        value: content,
+                                                        onChange: (e) => setContent(e.target.value),
+                                                        className: "h-48 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-y"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "draft-min-length" }, `最小字數 (${draftMinLength}字)`),
+                                                        React.createElement(Slider, {
+                                                            id: "draft-min-length",
+                                                            min: 100,
+                                                            max: 1000,
+                                                            step: 50,
+                                                            value: [draftMinLength],
+                                                            onValueChange: (val) => setDraftMinLength(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "draft-max-length" }, `最大字數 (${draftMaxLength}字)`),
+                                                        React.createElement(Slider, {
+                                                            id: "draft-max-length",
+                                                            min: 100,
+                                                            max: 1000,
+                                                            step: 50,
+                                                            value: [draftMaxLength],
+                                                            onValueChange: (val) => setDraftMaxLength(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "draft-num-paragraphs" }, `段落數 (${draftNumParagraphs}段)`),
+                                                        React.createElement(Slider, {
+                                                            id: "draft-num-paragraphs",
+                                                            min: 1,
+                                                            max: 10,
+                                                            step: 1,
+                                                            value: [draftNumParagraphs],
+                                                            onValueChange: (val) => setDraftNumParagraphs(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    )
+                                                ),
+                                                React.createElement(Button, { onClick: handleRewriteNewsDraft, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '開始改寫'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "長標題:"),
+                                                            longTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `lt-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "短標題 (20字以內):"),
+                                                            shortTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `st-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, { htmlFor: "generated-text-draft" }, "改寫後內容:"),
+                                                            React.createElement(Textarea, {
+                                                                id: "generated-text-draft",
+                                                                value: generatedText,
+                                                                readOnly: true,
+                                                                className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                            }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製改寫內容"
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製改寫後的新聞稿內容")
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: 外電新聞翻譯與改寫 */
+                                    React.createElement(TabsContent, { value: "translate-rewrite", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "外電新聞翻譯與改寫"),
+                                                React.createElement(CardDescription, null, "輸入外電新聞網址，AI 將自動翻譯並改寫，生成繁體中文新聞稿及標題。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "translate-url" }, "外電新聞網址"),
+                                                    React.createElement(Input, {
+                                                        id: "translate-url",
+                                                        type: "url",
+                                                        placeholder: "https://www.reuters.com/...",
+                                                        value: url,
+                                                        onChange: (e) => setUrl(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement(Button, { onClick: handleTranslateRewrite, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '開始翻譯改寫'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "長標題:"),
+                                                            longTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `lt-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "短標題 (20字以內):"),
+                                                            shortTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `st-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, { htmlFor: "translated-rewritten-text" }, "翻譯改寫後內容:"),
+                                                            React.createElement(Textarea, {
+                                                                id: "translated-rewritten-text",
+                                                                value: generatedText,
+                                                                readOnly: true,
+                                                                className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                            }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製內容"
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製翻譯改寫後的新聞稿內容")
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: 訪問內容生成新聞稿 */
+                                    React.createElement(TabsContent, { value: "generate-news", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "訪問內容生成新聞稿"),
+                                                React.createElement(CardDescription, null, "根據訪問內容，生成專業新聞稿及標題，可自訂長度、段落和語氣。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "visit-content" }, "訪問內容"),
+                                                    React.createElement(Textarea, {
+                                                        id: "visit-content",
+                                                        placeholder: "請在此處貼上訪問的文字內容...",
+                                                        value: visitContent,
+                                                        onChange: (e) => setVisitContent(e.target.value),
+                                                        className: "h-48 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-y"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "visit-title" }, "建議標題 (選填)"),
+                                                    React.createElement(Input, {
+                                                        id: "visit-title",
+                                                        type: "text",
+                                                        placeholder: "輸入建議的新聞標題",
+                                                        value: visitTitle,
+                                                        onChange: (e) => setVisitTitle(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "min-length" }, `最小字數 (${visitMinLength}字)`),
+                                                        React.createElement(Slider, {
+                                                            id: "min-length",
+                                                            min: 100,
+                                                            max: 1000,
+                                                            step: 50,
+                                                            value: [visitMinLength],
+                                                            onValueChange: (val) => setVisitMinLength(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "max-length" }, `最大字數 (${visitMaxLength}字)`),
+                                                        React.createElement(Slider, {
+                                                            id: "max-length",
+                                                            min: 100,
+                                                            max: 1000,
+                                                            step: 50,
+                                                            value: [visitMaxLength],
+                                                            onValueChange: (val) => setVisitMaxLength(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "num-paragraphs" }, `段落數 (${visitNumParagraphs}段)`),
+                                                        React.createElement(Slider, {
+                                                            id: "num-paragraphs",
+                                                            min: 1,
+                                                            max: 10,
+                                                            step: 1,
+                                                            value: [visitNumParagraphs],
+                                                            onValueChange: (val) => setVisitNumParagraphs(val[0]),
+                                                            className: "w-full"
+                                                        })
+                                                    )
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "tone" }, "語氣"),
+                                                    React.createElement(Select, { value: tone, onValueChange: setTone },
+                                                        React.createElement(SelectTrigger, { id: "tone", className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" },
+                                                            React.createElement(SelectValue, { placeholder: "選擇語氣" })
+                                                        ),
+                                                        React.createElement(SelectContent, null,
+                                                            React.createElement(SelectItem, { value: "neutral" }, "中立客觀"),
+                                                            React.createElement(SelectItem, { value: "formal" }, "正式嚴謹"),
+                                                            React.createElement(SelectItem, { value: "engaging" }, "生動引人"),
+                                                            React.createElement(SelectItem, { value: "announcement" }, "公告式")
+                                                        )
+                                                    )
+                                                ),
+                                                React.createElement(Button, { onClick: handleGenerateNews, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '生成新聞稿'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "長標題:"),
+                                                            longTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `lt-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "短標題 (20字以內):"),
+                                                            shortTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `st-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, { htmlFor: "generated-news-content" }, "新聞稿內容:"),
+                                                            React.createElement(Textarea, {
+                                                                id: "generated-news-content",
+                                                                value: generatedText,
+                                                                readOnly: true,
+                                                                className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                            }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製新聞稿"
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製生成的新聞稿內容")
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: 名人社群文章轉新聞 */
+                                    React.createElement(TabsContent, { value: "celebrity-social-to-news", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "名人社群文章轉新聞"),
+                                                React.createElement(CardDescription, null, "將名人社群貼文內容轉換為新聞稿，並生成標題。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "artist-name" }, "藝人名稱"),
+                                                    React.createElement(Input, {
+                                                        id: "artist-name",
+                                                        type: "text",
+                                                        placeholder: "例如：周杰倫",
+                                                        value: artistName,
+                                                        onChange: (e) => setArtistName(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "platform" }, "社群平台"),
+                                                    React.createElement(Input, {
+                                                        id: "platform",
+                                                        type: "text",
+                                                        placeholder: "例如：Instagram, Facebook, 微博",
+                                                        value: platform,
+                                                        onChange: (e) => setPlatform(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "post-content" }, "社群文章內容"),
+                                                    React.createElement(Textarea, {
+                                                        id: "post-content",
+                                                        placeholder: "請在此處貼上社群貼文的文字內容...",
+                                                        value: postContent,
+                                                        onChange: (e) => setPostContent(e.target.value),
+                                                        className: "h-32 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-y"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "media-description" }, "圖片/影片內容描述 (選填)"),
+                                                    React.createElement(Input, {
+                                                        id: "media-description",
+                                                        type: "text",
+                                                        placeholder: "例如：發布了新專輯封面照",
+                                                        value: mediaDescription,
+                                                        onChange: (e) => setMediaDescription(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "original-link" }, "原始貼文連結 (選填)"),
+                                                    React.createElement(Input, {
+                                                        id: "original-link",
+                                                        type: "url",
+                                                        placeholder: "https://www.instagram.com/...",
+                                                        value: originalLink,
+                                                        onChange: (e) => setOriginalLink(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "remark" }, "備註/特殊指示 (選填)"),
+                                                    React.createElement(Textarea, {
+                                                        id: "remark",
+                                                        placeholder: "例如：請強調其幽默感",
+                                                        value: remark,
+                                                        onChange: (e) => setRemark(e.target.value),
+                                                        className: "h-24 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-y"
+                                                    })
+                                                ),
+                                                React.createElement(Button, { onClick: handleCelebritySocialToNews, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '生成新聞'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "長標題:"),
+                                                            longTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `lt-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, null, "短標題 (20字以內):"),
+                                                            shortTitles.map((title, index) => (
+                                                                React.createElement('div', { key: `st-${index}`, className: "flex items-center space-x-2" },
+                                                                    React.createElement(Input, { value: title, readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                                    React.createElement(Tooltip, null,
+                                                                        React.createElement(TooltipTrigger, { asChild: true },
+                                                                            React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(title) },
+                                                                                React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                            )
+                                                                        ),
+                                                                        React.createElement(TooltipContent, null, "複製")
+                                                                    )
+                                                                )
+                                                            ))
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement(Label, { htmlFor: "celebrity-news-text" }, "新聞稿內容:"),
+                                                            React.createElement(Textarea, {
+                                                                id: "celebrity-news-text",
+                                                                value: generatedText,
+                                                                readOnly: true,
+                                                                className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                            }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製新聞稿"
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製生成的新聞稿內容")
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: YouTube 轉新聞 */
+                                    React.createElement(TabsContent, { value: "generate-news-from-youtube", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "YouTube 轉新聞"),
+                                                React.createElement(CardDescription, null, "輸入 YouTube 影片連結，AI 將自動提取資訊並生成新聞稿及標題。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "youtube-url" }, "YouTube 影片連結"),
+                                                    React.createElement(Input, {
+                                                        id: "youtube-url",
+                                                        type: "url",
+                                                        placeholder: "https://www.youtube.com/watch?v=...",
+                                                        value: youtubeUrl,
+                                                        onChange: (e) => setYoutubeUrl(e.target.value),
+                                                        className: "rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                                    })
+                                                ),
+                                                React.createElement(Button, { onClick: handleGenerateNewsFromYoutube, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '生成新聞'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                /* Display "開發中請稍待" here */
+                                                React.createElement('div', { className: "w-full space-y-4" },
+                                                    React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "生成結果"),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, null, "長標題:"),
+                                                        React.createElement('div', { className: "flex items-center space-x-2" },
+                                                            React.createElement(Input, { value: generatedLongTitle || '開發中請稍待', readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(generatedLongTitle || '開發中請稍待') },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製")
+                                                            )
+                                                        )
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, null, "短標題 (20字以內):"),
+                                                        React.createElement('div', { className: "flex items-center space-x-2" },
+                                                            React.createElement(Input, { value: generatedShortTitle || '開發中請稍待', readOnly: true, className: "flex-1 rounded-md border-gray-300 bg-gray-50" }),
+                                                            React.createElement(Tooltip, null,
+                                                                React.createElement(TooltipTrigger, { asChild: true },
+                                                                    React.createElement(Button, { variant: "ghost", size: "icon", onClick: () => handleCopyToClipboard(generatedShortTitle || '開發中請稍待') },
+                                                                        React.createElement(ClipboardCopy, { className: "h-4 w-4" })
+                                                                    )
+                                                                ),
+                                                                React.createElement(TooltipContent, null, "複製")
+                                                            )
+                                                        )
+                                                    ),
+                                                    React.createElement('div', { className: "space-y-2" },
+                                                        React.createElement(Label, { htmlFor: "generated-youtube-news-content" }, "新聞稿內容:"),
+                                                        React.createElement(Textarea, {
+                                                            id: "generated-youtube-news-content",
+                                                            value: generatedNewsContent || '開發中請稍待',
+                                                            readOnly: true,
+                                                            className: "h-48 rounded-md border-gray-300 bg-gray-50 resize-y"
+                                                        }),
+                                                        React.createElement(Tooltip, null,
+                                                            React.createElement(TooltipTrigger, { asChild: true },
+                                                                React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedNewsContent || '開發中請稍待') },
+                                                                    React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製新聞稿"
+                                                                )
+                                                            ),
+                                                            React.createElement(TooltipContent, null, "複製生成的新聞稿內容")
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Tab Content: 錯字校正 */
+                                    React.createElement(TabsContent, { value: "proofread-text", className: "mt-6" },
+                                        React.createElement(Card, { className: "rounded-lg shadow-md" },
+                                            React.createElement(CardHeader, null,
+                                                React.createElement(CardTitle, { className: "text-xl font-semibold text-indigo-700" }, "錯字校正與語法檢查"),
+                                                React.createElement(CardDescription, null, "輸入需要校對的文字，AI 將檢查錯字、語法和標點符號，並標記錯誤。")
+                                            ),
+                                            React.createElement(CardContent, { className: "space-y-4" },
+                                                React.createElement('div', { className: "grid w-full items-center gap-1.5" },
+                                                    React.createElement(Label, { htmlFor: "proofread-input-text" }, "輸入需要校對的內容"),
+                                                    React.createElement(Textarea, {
+                                                        id: "proofread-input-text",
+                                                        placeholder: "請在此處貼上您要校對的文字...",
+                                                        value: proofreadText,
+                                                        onChange: (e) => setProofreadText(e.target.value),
+                                                        className: "h-48 rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 resize-y"
+                                                    })
+                                                ),
+                                                React.createElement(Button, { onClick: handleProofreadText, className: "w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 px-4 shadow-md transition-colors", disabled: loading },
+                                                    loading ? '處理中...' : '開始校正'
+                                                )
+                                            ),
+                                            React.createElement(CardFooter, { className: "flex flex-col items-start space-y-4" },
+                                                loading && React.createElement(LoadingSpinner, null),
+                                                generatedText && (
+                                                    React.createElement('div', { className: "w-full space-y-4" },
+                                                        React.createElement(Label, { className: "font-semibold text-lg text-indigo-700" }, "校正結果"),
+                                                        // HERE IS THE KEY CHANGE: Use a div to render the React elements
+                                                        React.createElement('div', {
+                                                            id: "proofread-output-display",
+                                                            className: "corrected-text-display" // Apply custom styling for the div
+                                                        }, renderCorrectedText(generatedText)),
+                                                        React.createElement(Tooltip, null,
+                                                            React.createElement(TooltipTrigger, { asChild: true },
+                                                                React.createElement(Button, { variant: "outline", className: "w-full mt-2", onClick: () => handleCopyToClipboard(generatedText) },
+                                                                    React.createElement(ClipboardCopy, { className: "h-4 w-4 mr-2" }), "複製校正結果 (純文字)"
+                                                                )
+                                                            ),
+                                                            React.createElement(TooltipContent, null, "複製校正後的純文字內容")
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        React.createElement(MessageBox, { message: message, type: messageType, onClose: () => setMessage('') })
+                    )
+                )
+            );
+        }
+
+        // 確保 DOM 完全載入後再渲染 React 應用
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded. Attempting to render React app.');
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                console.log('Root element found. Creating React root.');
+                const root = ReactDOM.createRoot(rootElement);
+                root.render(React.createElement(App));
+                console.log('React app render initiated.');
+            } else {
+                console.error('Error: Root element with id "root" not found in the document. React app cannot be mounted.');
+            }
+        });
+    </script>
+</body>
+</html>
