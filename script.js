@@ -60,6 +60,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const correctedTextOptimizedTitles = document.getElementById('correctedTextOptimizedTitles');
 
     const historyList = document.getElementById('historyList');
+    
+    // 自定義彈窗功能，取代 alert 和 confirm
+    const showModal = (message, type = 'alert', callback = () => {}) => {
+        const modalId = 'custom-modal';
+        let modal = document.getElementById(modalId);
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <p id="modal-message"></p>
+                    <div class="modal-buttons">
+                        <button id="modal-confirm-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 hidden">確定</button>
+                        <button id="modal-cancel-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">關閉</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        document.getElementById('modal-message').textContent = message;
+        const confirmBtn = document.getElementById('modal-confirm-btn');
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+        
+        confirmBtn.onclick = () => {
+            callback(true);
+            modal.style.display = 'none';
+        };
+        cancelBtn.onclick = () => {
+            if (type === 'confirm') {
+                callback(false);
+            }
+            modal.style.display = 'none';
+        };
+
+        if (type === 'confirm') {
+            confirmBtn.classList.remove('hidden');
+            cancelBtn.textContent = '取消';
+        } else {
+            confirmBtn.classList.add('hidden');
+            cancelBtn.textContent = '關閉';
+        }
+        
+        modal.style.display = 'flex';
+    };
 
     // 歷史記錄功能
     let history = JSON.parse(localStorage.getItem('aiNewsHistory')) || [];
@@ -170,26 +215,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (textToCopy) {
-                     textToCopy = unescapeHtml(textToCopy); // 確保複製的是純文本
+                    textToCopy = unescapeHtml(textToCopy); // 確保複製的是純文本
                 } else {
                     textToCopy = "無法複製內容";
                 }
 
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    alert('內容已複製到剪貼簿！');
-                }).catch(err => {
-                    console.error('複製失敗:', err);
-                });
+                document.execCommand('copy');
+                // Use custom modal instead of alert
+                showModal('內容已複製到剪貼簿！');
             };
         });
 
         document.querySelectorAll('.delete-btn').forEach(button => {
             button.onclick = (e) => {
                 const index = e.target.dataset.index;
-                if (confirm('確定要刪除這條歷史記錄嗎？')) {
-                    history.splice(index, 1);
-                    saveHistory();
-                }
+                showModal('確定要刪除這條歷史記錄嗎？', 'confirm', (result) => {
+                    if (result) {
+                        history.splice(index, 1);
+                        saveHistory();
+                    }
+                });
             };
         });
     };
@@ -215,7 +260,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ulElement.appendChild(li);
         }
     }
+    
+    // 顯示載入動畫的函數
+    const showLoading = (element) => {
+        element.innerHTML = '<div class="loading-spinner"></div>';
+    };
 
+    const hideLoading = (element, originalText) => {
+        element.innerHTML = originalText;
+    };
 
     // 通用處理函數，用於處理 AI 請求
     async function handleAIRequest(button, outputField, apiEndpoint, payload, titlesOutputElement) {
@@ -231,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (titlesOutputElement) {
-             renderOptimizedTitles(titlesOutputElement, null);
+            renderOptimizedTitles(titlesOutputElement, null);
         }
 
         try {
@@ -247,13 +300,25 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             console.log(`[Frontend Debug] Received response status: ${response.status}`);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            console.log(`[Frontend Debug] Received Content-Type: ${response.headers.get('Content-Type')}`);
+            
+            // 檢查回應的 Content-Type
+            const contentType = response.headers.get('Content-Type');
+            let data;
+            if (contentType && contentType.includes('application/json')) {
+                // 如果是 JSON，就正常解析
+                data = await response.json();
+            } else {
+                // 如果不是 JSON，則讀取為文字，並拋出錯誤
+                const text = await response.text();
+                throw new Error(`伺服器沒有回傳有效的 JSON。回應狀態: ${response.status}。回應內容：${text.substring(0, 500)}...`);
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                // 如果狀態碼不 OK，且已經成功解析為 JSON，則拋出伺服器定義的錯誤
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            }
+
             console.log(`[Frontend Debug] Received data:`, data);
 
             // --- API 響應處理邏輯已更新 ---
@@ -281,8 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultText = result.celebrityNewsText;
                 historyType = '名人社群文章轉新聞';
             } else if (apiEndpoint === '/generate-news-from-youtube') {
-                 resultText = result.newsContent;
-                 historyType = 'YouTube 連結轉新聞';
+                resultText = result.newsContent;
+                historyType = 'YouTube 連結轉新聞';
             } else if (apiEndpoint === '/proofread-text') {
                 resultText = result.correctedText;
                 historyType = '錯字校正與語法檢查';
@@ -310,12 +375,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('[Frontend Debug] 發生錯誤:', error);
+            const errorMessage = `發生錯誤：${error.message}`;
             if (outputField.id === 'correctedTextOutput') {
-                 outputField.innerHTML = `<p style="color: red;">發生錯誤：${error.message}</p>`;
+                outputField.innerHTML = `<p style="color: red;">${errorMessage}</p>`;
             } else {
-                outputField.value = `發生錯誤：${error.message}`;
+                outputField.value = errorMessage;
             }
-            alert(`操作失敗：${error.message}`);
+            showModal(`操作失敗：${error.message}`);
         } finally {
             button.disabled = false;
         }
@@ -332,14 +398,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tone: toneSelect.value
         };
         handleAIRequest(generateNewsBtn, generatedNewsOutput, '/generate-news', payload,
-                        generatedNewsOptimizedTitles);
+            generatedNewsOptimizedTitles);
     });
 
     // 事件監聽器：新聞連結改寫
     rewriteUrlBtn.addEventListener('click', () => {
         const payload = { url: rewriteUrlInput.value };
         handleAIRequest(rewriteUrlBtn, rewrittenUrlOutput, '/rewrite-url', payload,
-                        rewrittenUrlOptimizedTitles);
+            rewrittenUrlOptimizedTitles);
     });
 
     // 事件監聽器：新聞稿改寫
@@ -349,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isBrandsFiltered: isBrandsFiltered.checked
         };
         handleAIRequest(rewriteNewsDraftBtn, rewrittenNewsDraftOutput, '/rewrite-news-draft', payload,
-                        rewrittenNewsDraftOptimizedTitles);
+            rewrittenNewsDraftOptimizedTitles);
     });
 
     // 事件監聽器：外電新聞翻譯與改寫
@@ -359,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceLanguage: sourceLanguageSelect.value
         };
         handleAIRequest(translateRewriteBtn, translatedRewrittenOutput, '/translate-rewrite', payload,
-                        translatedRewrittenOptimizedTitles);
+            translatedRewrittenOptimizedTitles);
     });
 
     // 事件監聽器：名人社群文章轉新聞
@@ -374,23 +440,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (!payload.artistName || !payload.postContent) {
-            alert('藝人名稱和社群文章內容為必填項。');
+            showModal('藝人名稱和社群文章內容為必填項。');
             return;
         }
 
         handleAIRequest(generateSocialNewsBtn, generatedSocialNewsOutput, '/celebrity-social-to-news', payload,
-                        generatedSocialNewsOptimizedTitles);
+            generatedSocialNewsOptimizedTitles);
     });
 
     // 事件監聽器：YouTube 連結轉新聞
     generateYoutubeNewsBtn.addEventListener('click', () => {
         const payload = { youtubeUrl: youtubeUrlInput.value };
         if (!payload.youtubeUrl) {
-            alert('請輸入 YouTube 影片連結。');
+            showModal('請輸入 YouTube 影片連結。');
             return;
         }
         handleAIRequest(generateYoutubeNewsBtn, generatedYoutubeNewsOutput, '/generate-news-from-youtube', payload,
-                        generatedYoutubeNewsOptimizedTitles);
+            generatedYoutubeNewsOptimizedTitles);
     });
 
 
@@ -398,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     proofreadTextBtn.addEventListener('click', () => {
         const payload = { text: proofreadTextInput.value };
         handleAIRequest(proofreadTextBtn, correctedTextOutput, '/proofread-text', payload,
-                        correctedTextOptimizedTitles);
+            correctedTextOptimizedTitles);
     });
 
     // 統一的複製按鈕事件監聽器
@@ -429,14 +495,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (textToCopy) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    alert('內容已複製到剪貼簿！');
-                }).catch(err => {
-                    console.error('複製失敗:', err);
-                    alert('複製失敗，請手動複製。');
-                });
+                document.execCommand('copy');
+                showModal('內容已複製到剪貼簿！');
             } else {
-                alert('沒有內容可以複製。');
+                showModal('沒有內容可以複製。');
             }
         });
     });
@@ -487,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // 如果沒有任何區塊在視圖內，則默認激活第一個連結
             if (window.scrollY < sections[0].offsetTop - 80) {
-                 navLinks[0].classList.add('active');
+                navLinks[0].classList.add('active');
             }
         }
     };
