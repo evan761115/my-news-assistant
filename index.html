@@ -181,7 +181,8 @@
                         }
                     };
 
-                    const apiKey = AIzaSyCjFGXup0Yy0mwCV8rQYazcKp9e2fmx3Fg
+                    // 請在這裡填入您的 API 金鑰。請將 "YOUR_API_KEY_HERE" 替換成您的金鑰字串。
+                    const apiKey = AIzaSyCjFGXup0Yy0mwCV8rQYazcKp9e2fmx3Fg;
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                     
                     let response;
@@ -208,8 +209,8 @@
                                 await new Promise(res => setTimeout(res, delay));
                             } else if (response.status === 403) {
                                 const errorText = await response.text();
-                                console.error('API 請求失敗，狀態碼 403。可能是因為輸入內容觸發了內容安全政策。完整的錯誤回應：', errorText);
-                                throw new Error(`API 請求失敗，狀態碼: 403。請檢查輸入內容是否包含敏感詞彙或不當資訊。`);
+                                console.error('API 請求失敗，狀態碼 403。可能是因為輸入內容觸發了內容安全政策，或是 API Key 無效。完整的錯誤回應：', errorText);
+                                throw new Error(`API 請求失敗，狀態碼: 403。請檢查輸入內容是否包含敏感詞彙或不當資訊，並確認您的 API Key 是否有效。`);
                             } else {
                                 const errorText = await response.text();
                                 console.error('API 請求失敗，狀態碼:', response.status, '完整的錯誤回應：', errorText);
@@ -329,6 +330,8 @@
                     setOutput(result.rewrittenText);
                     setOptimizedTitles(result.optimizedTitles);
                 } else {
+                    // 這裡的 error 變數在 handleAPIRequest 已經被設置，直接使用即可。
+                    // 由於 handleAPIRequest 在 catch 區塊中會拋出帶有詳細資訊的錯誤，所以這裡的 error 變數會包含這些資訊。
                     setOutput(`功能執行失敗，錯誤：${error}`);
                     setOptimizedTitles(null);
                 }
