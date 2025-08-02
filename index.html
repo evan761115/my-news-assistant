@@ -147,16 +147,41 @@
         };
         
         // 輔助函數：從 URL 提取網站名稱
-        const extractDomainName = (url) => {
+        const extractSourceName = (url) => {
             try {
                 const urlObj = new URL(url);
-                const domain = urlObj.hostname;
-                const parts = domain.split('.');
-                if (parts.length > 2 && parts[0] === 'www') {
-                    return parts[1] || domain;
+                const domain = urlObj.hostname.toLowerCase();
+                // 來源名稱對應表，確保來源名稱正確
+                const sourceMap = {
+                    'ettoday.net': 'ETtoday新聞雲',
+                    'udn.com': '聯合新聞網',
+                    'appledaily.com': '壹蘋新聞網',
+                    'tvbs.com.tw': 'TVBS新聞網',
+                    'setn.com': '三立新聞網',
+                    'ctwant.com': 'CTWANT',
+                    'chinatimes.com': '中時新聞網',
+                    'news.ltn.com.tw': '自由時報',
+                    'ftvnews.com.tw': '民視新聞網',
+                    'cna.com.tw': '中央社',
+                    'yahoo.com': 'Yahoo新聞',
+                    'google.com': 'Google新聞' // 雖然不精確，但可用作預設
+                };
+
+                for (const key in sourceMap) {
+                    if (domain.includes(key)) {
+                        return sourceMap[key];
+                    }
                 }
-                return parts[0] || domain;
+                
+                // 如果沒有找到，返回域名主體
+                const parts = domain.split('.');
+                if (parts.length >= 2) {
+                    return parts[parts.length - 2].charAt(0).toUpperCase() + parts[parts.length - 2].slice(1);
+                }
+
+                return '新聞網站';
             } catch (e) {
+                console.error("URL解析失敗:", e);
                 return '新聞網站';
             }
         };
@@ -183,6 +208,7 @@
             });
             const [linkRewriteData, setLinkRewriteData] = useState({
                 url: '',
+                title: '',
                 content: '',
             });
 
@@ -340,17 +366,34 @@
                         `;
                         break;
                     case 'link-rewrite':
-                        if (!linkRewriteData.url.trim() || !linkRewriteData.content.trim()) { setError('請同時輸入新聞連結和新聞內容！'); return; }
+                        if (!linkRewriteData.url.trim() || (!linkRewriteData.title.trim() && !linkRewriteData.content.trim())) {
+                            setError('請至少輸入新聞連結和新聞標題！新聞內容可選擇性填入。');
+                            return;
+                        }
+                        const sourceName = extractSourceName(linkRewriteData.url);
                         const linkBrandFilter = isBrandsFiltered ? '請將品牌名稱濾掉，並使用通順的詞彙替代。' : '';
-                        const sourceName = extractDomainName(linkRewriteData.url);
+                        
+                        let rewriteContent;
+                        if (linkRewriteData.content.trim()) {
+                            rewriteContent = linkRewriteData.content.trim();
+                        } else {
+                            // 如果沒有內容，就以標題為主要撰寫主軸
+                            rewriteContent = `標題：${linkRewriteData.title.trim()}`;
+                        }
+
                         prompt = `${basePrompt}
-                        請根據以下新聞連結的內容改寫成一篇新稿，語氣保持客觀，並且在第二段開頭明確指出來源。
+                        請根據以下提供的資訊改寫成一篇新聞稿，語氣保持客觀。
                         ${linkBrandFilter}
-                        改寫重點：不要用太多原文，但要保持核心資訊不變。
-                        新聞來源網址：${linkRewriteData.url}
-                        請從新聞來源網址中提取網站名稱，並在第二段開頭寫：「根據《${sourceName}》報導」。
-                        新聞內容：
-                        ${linkRewriteData.content}
+                        改寫重點：
+                        - 若有提供新聞內容，請根據內容改寫。
+                        - 若無提供新聞內容，請以新聞標題為主軸，擴寫成一篇新聞稿。
+                        - 不要用太多原文，但要保持核心資訊不變。
+                        - 在第二段開頭明確指出來源，請寫：「根據《${sourceName}》報導」。
+                        
+                        新聞資訊：
+                        新聞連結：${linkRewriteData.url}
+                        新聞標題：${linkRewriteData.title}
+                        新聞內容：${rewriteContent}
                         `;
                         break;
                     case 'social-to-news':
@@ -385,7 +428,7 @@
                 switch (activeTab) {
                     case 'highlights': return { inputLabel: "新聞重點內容:", inputPlaceholder: "請輸入採訪重點或是條列式內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（生成新聞）" };
                     case 'rewrite': return { inputLabel: "通稿內容:", inputPlaceholder: "請輸入需要改寫的通稿內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（改寫）" };
-                    case 'link-rewrite': return { inputLabel: "新聞內容:", inputPlaceholder: "請將原文內容貼於此處，並在上方填入連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（新聞連結改寫）" };
+                    case 'link-rewrite': return { inputLabel: "新聞內容:", inputPlaceholder: "請將原文內容貼於此處（選填），若無填寫則會以新聞標題為主軸進行改寫...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（新聞連結改寫）" };
                     case 'social-to-news': return { inputLabel: "社群文章內容:", inputPlaceholder: "請輸入藝人社群文章內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（社群轉新聞）" };
                     default: return {};
                 }
@@ -458,7 +501,7 @@
                                         setOutput('');
                                         setInputContent('');
                                         setCelebrityData({ name: '', platform: '', content: '', imageDesc: '', link: '', notes: '' });
-                                        setLinkRewriteData({ url: '', content: '' });
+                                        setLinkRewriteData({ url: '', title: '', content: '' });
                                     }
                                 },
                                     tab === 'highlights' && React.createElement(MessageSquare, { className: "mr-2 h-4 w-4" }),
@@ -530,6 +573,15 @@
                                                 placeholder: "請貼上新聞網址，如：https://www.ettoday.net/...",
                                                 value: linkRewriteData.url,
                                                 onChange: (e) => setLinkRewriteData({ ...linkRewriteData, url: e.target.value })
+                                            })
+                                        ),
+                                        React.createElement('div', { className: "space-y-2" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "新聞標題（必填）："),
+                                            React.createElement('input', {
+                                                type: 'text', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: "請貼上新聞原始標題，作為改寫主軸。",
+                                                value: linkRewriteData.title,
+                                                onChange: (e) => setLinkRewriteData({ ...linkRewriteData, title: e.target.value })
                                             })
                                         ),
                                         React.createElement('div', { className: "space-y-2" },
@@ -650,7 +702,7 @@
                                 disabled: isLoading ||
                                             (!inputContent.trim() && (activeTab === 'highlights' || activeTab === 'rewrite')) ||
                                             (!celebrityData.content.trim() && activeTab === 'social-to-news') ||
-                                            ((!linkRewriteData.url.trim() || !linkRewriteData.content.trim()) && activeTab === 'link-rewrite')
+                                            (!linkRewriteData.url.trim() || (!linkRewriteData.title.trim() && !linkRewriteData.content.trim()))
                             },
                                 isLoading && React.createElement(Loader, { className: "mr-2 h-5 w-5 animate-spin" }),
                                 content.buttonText
