@@ -127,6 +127,10 @@
         const { useState, useCallback, useEffect } = React;
         import { ClipboardCopy, Loader, XCircle, PenTool, MessageSquare, User, Star } from 'https://esm.sh/lucide-react@0.395.0';
 
+        // 請在這裡填入您的 API 金鑰。請將 "YOUR_API_KEY_HERE" 替換成您的金鑰字串。
+        // 例如: const apiKey = "AIzaSyC-HI1V9n1kpqYuvuaWz6TlFUUkQ7FZPcc";
+        const apiKey = "";
+        
         // 輔助函數：條件式 className
         function classNames(...classes) {
             return classes.filter(Boolean).join(' ');
@@ -164,6 +168,14 @@
 
             // 處理 API 請求，整合瀏覽功能與重試機制
             const handleAPIRequest = useCallback(async (prompt, schema) => {
+                // 在這裡檢查 API 金鑰是否已經被設置
+                if (!apiKey) {
+                    const errorMessage = 'API 金鑰未填入。請在程式碼的 `const apiKey = "";` 中填入您的金鑰。';
+                    setError(errorMessage);
+                    setIsLoading(false);
+                    return null;
+                }
+
                 setIsLoading(true);
                 setError(null);
                 setOutput('AI 正在努力生成中，請稍候...');
@@ -181,8 +193,6 @@
                         }
                     };
 
-                    // 請在這裡填入您的 API 金鑰。請將 "YOUR_API_KEY_HERE" 替換成您的金鑰字串。
-                    const apiKey = AIzaSyCjFGXup0Yy0mwCV8rQYazcKp9e2fmx3Fg;
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                     
                     let response;
@@ -330,8 +340,6 @@
                     setOutput(result.rewrittenText);
                     setOptimizedTitles(result.optimizedTitles);
                 } else {
-                    // 這裡的 error 變數在 handleAPIRequest 已經被設置，直接使用即可。
-                    // 由於 handleAPIRequest 在 catch 區塊中會拋出帶有詳細資訊的錯誤，所以這裡的 error 變數會包含這些資訊。
                     setOutput(`功能執行失敗，錯誤：${error}`);
                     setOptimizedTitles(null);
                 }
