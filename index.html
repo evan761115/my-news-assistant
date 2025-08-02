@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ETtoday AI 新聞小幫手</title>
+    <title>AI 新聞小幫手</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* ETtoday 品牌色 */
+        /* 品牌色 */
         :root {
             --primary-blue: #3B427F;
             --secondary-orange: #F47920;
@@ -125,7 +125,7 @@
         import React from 'https://esm.sh/react@18.2.0';
         import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
         const { useState, useCallback, useEffect } = React;
-        import { ClipboardCopy, Loader, XCircle, PenTool, FileText, MessageSquare, Link, User, Star } from 'https://esm.sh/lucide-react@0.395.0';
+        import { ClipboardCopy, Loader, XCircle, PenTool, MessageSquare, User, Star } from 'https://esm.sh/lucide-react@0.395.0';
 
         // 輔助函數：條件式 className
         function classNames(...classes) {
@@ -268,7 +268,7 @@
                 let prompt = '';
                 const schema = commonSchema;
 
-                const basePrompt = `請根據ETtoday新聞雲星光雲的寫作風格，以台灣繁體中文撰寫一篇新聞。
+                const basePrompt = `請以標準的新聞風格，用台灣繁體中文撰寫一篇新聞。
                     請注意，如果原稿中有提到品牌名稱，請不要寫到，並使用中性詞彙替換。
                     請提供三種不同風格的標題建議：正統、藏標和特別。
                     每種風格的標題都要有兩種長度：
