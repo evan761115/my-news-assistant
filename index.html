@@ -125,7 +125,7 @@
         import React from 'https://esm.sh/react@18.2.0';
         import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
         const { useState, useCallback, useEffect } = React;
-        import { ClipboardCopy, Loader, XCircle, PenTool, MessageSquare, User, Star, Link, Globe } from 'https://esm.sh/lucide-react@0.395.0';
+        import { ClipboardCopy, Loader, XCircle, PenTool, MessageSquare, User, Star, Link } from 'https://esm.sh/lucide-react@0.395.0';
 
         // 請在這裡填入您的 API 金鑰。請將 "YOUR_API_KEY_HERE" 替換成您的金鑰字串。
         // **注意：您的金鑰字串必須用雙引號 (") 完整地包住！**
@@ -146,6 +146,21 @@
             }, duration);
         };
         
+        // 輔助函數：從 URL 提取網站名稱
+        const extractDomainName = (url) => {
+            try {
+                const urlObj = new URL(url);
+                const domain = urlObj.hostname;
+                const parts = domain.split('.');
+                if (parts.length > 2 && parts[0] === 'www') {
+                    return parts[1] || domain;
+                }
+                return parts[0] || domain;
+            } catch (e) {
+                return '新聞網站';
+            }
+        };
+
         // 主要應用程式元件
         const App = () => {
             // 狀態管理
@@ -166,12 +181,8 @@
                 link: '',
                 notes: '',
             });
-            const [newsRewriteData, setNewsRewriteData] = useState({
-                source: '',
-                content: '',
-            });
-            const [foreignNewsRewriteData, setForeignNewsRewriteData] = useState({
-                source: '',
+            const [linkRewriteData, setLinkRewriteData] = useState({
+                url: '',
                 content: '',
             });
 
@@ -300,10 +311,10 @@
                 let prompt = '';
                 const schema = commonSchema;
 
-                const basePrompt = `你是一位資深娛樂新聞記者，請以星光雲的娛樂新聞風格撰寫一篇新聞稿，並遵守以下規則：
+                const basePrompt = `你是一位資深娛樂新聞記者，請以星光雲的娛樂新聞調性撰寫一篇新聞稿，並遵守以下規則：
                     1. 使用台灣繁體中文。
                     2. 如果原稿中有提到品牌名稱，請不要寫到，並使用中性詞彙替換。
-                    3. 新聞稿分段撰寫，每段字數不超過 160 字。
+                    3. 新聞稿分段撰寫，每段字數不超過 160 字。分段請使用空行明確區隔。
                     4. 標題請提供三種不同風格：正統、藏標和特別。
                     5. 每種標題風格都要有兩種長度：長標 (25-30字) 和短標 (15-20字)。
                     6. 標題不能包含逗號，但可以使用驚嘆號或問號。
@@ -328,28 +339,18 @@
                         ${inputContent}
                         `;
                         break;
-                    case 'news-link-rewrite':
-                        if (!newsRewriteData.content.trim() || !newsRewriteData.source.trim()) { setError('請輸入新聞內容和新聞來源！'); return; }
-                        const newsLinkBrandFilter = isBrandsFiltered ? '請將品牌名稱濾掉，並使用通順的詞彙替代。' : '';
+                    case 'link-rewrite':
+                        if (!linkRewriteData.url.trim() || !linkRewriteData.content.trim()) { setError('請同時輸入新聞連結和新聞內容！'); return; }
+                        const linkBrandFilter = isBrandsFiltered ? '請將品牌名稱濾掉，並使用通順的詞彙替代。' : '';
+                        const sourceName = extractDomainName(linkRewriteData.url);
                         prompt = `${basePrompt}
-                        請將以下新聞內容改寫成一篇新稿，語氣保持客觀，並且在第二段開頭明確指出來源。
-                        ${newsLinkBrandFilter}
+                        請根據以下新聞連結的內容改寫成一篇新稿，語氣保持客觀，並且在第二段開頭明確指出來源。
+                        ${linkBrandFilter}
                         改寫重點：不要用太多原文，但要保持核心資訊不變。
-                        新聞來源：${newsRewriteData.source}
+                        新聞來源網址：${linkRewriteData.url}
+                        請從新聞來源網址中提取網站名稱，並在第二段開頭寫：「根據《${sourceName}》報導」。
                         新聞內容：
-                        ${newsRewriteData.content}
-                        `;
-                        break;
-                    case 'foreign-news-link-rewrite':
-                        if (!foreignNewsRewriteData.content.trim() || !foreignNewsRewriteData.source.trim()) { setError('請輸入新聞內容和新聞來源！'); return; }
-                        const foreignNewsBrandFilter = isBrandsFiltered ? '請將品牌名稱濾掉，並使用通順的詞彙替代。' : '';
-                        prompt = `${basePrompt}
-                        請將以下外電新聞內容翻譯並改寫成一篇新稿，語氣保持客觀，並且在第二段開頭明確指出來源。
-                        ${foreignNewsBrandFilter}
-                        改寫重點：不要用太多原文，但要保持核心資訊不變。
-                        外電來源：${foreignNewsRewriteData.source}
-                        外電內容：
-                        ${foreignNewsRewriteData.content}
+                        ${linkRewriteData.content}
                         `;
                         break;
                     case 'social-to-news':
@@ -377,16 +378,15 @@
                     setOutput(`功能執行失敗，錯誤：${error}`);
                     setOptimizedTitles(null);
                 }
-            }, [activeTab, inputContent, wordCount, paragraphCount, celebrityData, newsRewriteData, foreignNewsRewriteData, isBrandsFiltered, handleAPIRequest, error]);
+            }, [activeTab, inputContent, wordCount, paragraphCount, celebrityData, linkRewriteData, isBrandsFiltered, handleAPIRequest, error]);
 
             // 根據不同 Tab 取得 UI 內容
             const getTabContent = useCallback(() => {
                 switch (activeTab) {
                     case 'highlights': return { inputLabel: "新聞重點內容:", inputPlaceholder: "請輸入採訪重點或是條列式內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（生成新聞）" };
                     case 'rewrite': return { inputLabel: "通稿內容:", inputPlaceholder: "請輸入需要改寫的通稿內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（改寫）" };
+                    case 'link-rewrite': return { inputLabel: "新聞內容:", inputPlaceholder: "請將原文內容貼於此處，並在上方填入連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（新聞連結改寫）" };
                     case 'social-to-news': return { inputLabel: "社群文章內容:", inputPlaceholder: "請輸入藝人社群文章內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（社群轉新聞）" };
-                    case 'news-link-rewrite': return { inputLabel: "新聞內容:", inputPlaceholder: "請輸入需要改寫的新聞內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（新聞連結改寫）" };
-                    case 'foreign-news-link-rewrite': return { inputLabel: "外電內容:", inputPlaceholder: "請輸入需要改寫的外電新聞內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（外電連結改寫）" };
                     default: return {};
                 }
             }, [activeTab]);
@@ -444,7 +444,7 @@
                     React.createElement('div', { className: "p-6 sm:p-8" },
                         // 按鈕區塊 - 重新設計為水平置中
                         React.createElement('div', { className: "flex flex-wrap justify-center gap-4 mb-8 p-2 rounded-full bg-[#E8F5FD] shadow-inner" },
-                            ['highlights', 'rewrite', 'news-link-rewrite', 'foreign-news-link-rewrite', 'social-to-news'].map(tab => (
+                            ['highlights', 'rewrite', 'link-rewrite', 'social-to-news'].map(tab => (
                                 React.createElement('button', {
                                     key: tab,
                                     className: classNames(
@@ -458,16 +458,14 @@
                                         setOutput('');
                                         setInputContent('');
                                         setCelebrityData({ name: '', platform: '', content: '', imageDesc: '', link: '', notes: '' });
-                                        setNewsRewriteData({ source: '', content: '' });
-                                        setForeignNewsRewriteData({ source: '', content: '' });
+                                        setLinkRewriteData({ url: '', content: '' });
                                     }
                                 },
                                     tab === 'highlights' && React.createElement(MessageSquare, { className: "mr-2 h-4 w-4" }),
                                     tab === 'rewrite' && React.createElement(PenTool, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'news-link-rewrite' && React.createElement(Link, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'foreign-news-link-rewrite' && React.createElement(Globe, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'link-rewrite' && React.createElement(Link, { className: "mr-2 h-4 w-4" }),
                                     tab === 'social-to-news' && React.createElement(User, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'highlights' ? "重點轉新聞" : tab === 'rewrite' ? "通稿改寫" : tab === 'news-link-rewrite' ? "新聞連結改寫" : tab === 'foreign-news-link-rewrite' ? "外電連結改寫" : "社群轉新聞"
+                                    tab === 'highlights' ? "重點轉新聞" : tab === 'rewrite' ? "通稿改寫" : tab === 'link-rewrite' ? "新聞連結改寫" : "社群轉新聞"
                                 )
                             ))
                         ),
@@ -510,7 +508,7 @@
                                                 )
                                             )
                                         ),
-                                        (activeTab === 'rewrite' || activeTab === 'news-link-rewrite' || activeTab === 'foreign-news-link-rewrite') && (
+                                        activeTab === 'rewrite' && (
                                             React.createElement('div', { className: "flex items-center space-x-2" },
                                                 React.createElement('input', {
                                                     type: 'checkbox', id: 'isBrandsFiltered',
@@ -523,15 +521,15 @@
                                         )
                                     )
                                 ),
-                                (activeTab === 'news-link-rewrite' || activeTab === 'foreign-news-link-rewrite') && (
+                                activeTab === 'link-rewrite' && (
                                     React.createElement('div', { className: "space-y-4" },
                                         React.createElement('div', { className: "space-y-2" },
-                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "新聞來源:"),
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "新聞來源連結："),
                                             React.createElement('input', {
-                                                type: 'text', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
-                                                placeholder: "如：聯合新聞網、ETtoday",
-                                                value: activeTab === 'news-link-rewrite' ? newsRewriteData.source : foreignNewsRewriteData.source,
-                                                onChange: (e) => activeTab === 'news-link-rewrite' ? setNewsRewriteData({ ...newsRewriteData, source: e.target.value }) : setForeignNewsRewriteData({ ...foreignNewsRewriteData, source: e.target.value })
+                                                type: 'url', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: "請貼上新聞網址，如：https://www.ettoday.net/...",
+                                                value: linkRewriteData.url,
+                                                onChange: (e) => setLinkRewriteData({ ...linkRewriteData, url: e.target.value })
                                             })
                                         ),
                                         React.createElement('div', { className: "space-y-2" },
@@ -539,8 +537,8 @@
                                             React.createElement('textarea', {
                                                 className: "input-field w-full p-4 h-64 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
                                                 placeholder: content.inputPlaceholder,
-                                                value: activeTab === 'news-link-rewrite' ? newsRewriteData.content : foreignNewsRewriteData.content,
-                                                onChange: (e) => activeTab === 'news-link-rewrite' ? setNewsRewriteData({ ...newsRewriteData, content: e.target.value }) : setForeignNewsRewriteData({ ...foreignNewsRewriteData, content: e.target.value })
+                                                value: linkRewriteData.content,
+                                                onChange: (e) => setLinkRewriteData({ ...linkRewriteData, content: e.target.value })
                                             })
                                         ),
                                         React.createElement('div', { className: "flex items-center space-x-2" },
@@ -626,7 +624,7 @@
                                         ),
                                         React.createElement('div', {
                                             className: "output-field w-full h-80 overflow-y-auto p-4 text-sm rounded-lg output-scroll",
-                                            dangerouslySetInnerHTML: { __html: output.replace(/\n/g, '<br />') }
+                                            dangerouslySetInnerHTML: { __html: output.replace(/\n\n/g, '<br /><br />').replace(/\n/g, '<br />') }
                                         })
                                     ),
                                     optimizedTitles && React.createElement('div', { className: "space-y-4 mt-8" },
@@ -649,10 +647,10 @@
                             React.createElement('button', {
                                 className: "w-full flex items-center justify-center p-4 font-semibold rounded-lg text-white submit-button hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                                 onClick: handleSubmit,
-                                disabled: isLoading || (!inputContent.trim() && (activeTab === 'highlights' || activeTab === 'rewrite')) ||
-                                          (!celebrityData.content.trim() && activeTab === 'social-to-news') ||
-                                          (!newsRewriteData.content.trim() && activeTab === 'news-link-rewrite') ||
-                                          (!foreignNewsRewriteData.content.trim() && activeTab === 'foreign-news-link-rewrite')
+                                disabled: isLoading ||
+                                            (!inputContent.trim() && (activeTab === 'highlights' || activeTab === 'rewrite')) ||
+                                            (!celebrityData.content.trim() && activeTab === 'social-to-news') ||
+                                            ((!linkRewriteData.url.trim() || !linkRewriteData.content.trim()) && activeTab === 'link-rewrite')
                             },
                                 isLoading && React.createElement(Loader, { className: "mr-2 h-5 w-5 animate-spin" }),
                                 content.buttonText
