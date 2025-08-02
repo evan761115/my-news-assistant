@@ -140,19 +140,7 @@
                 messageBox.classList.remove('show');
             }, duration);
         };
-        // 輔助函數：從 URL 獲取媒體名稱
-        const getDomainName = (url) => {
-            try {
-                const urlObj = new URL(url);
-                const hostname = urlObj.hostname;
-                if (hostname.includes('聯合新聞網')) return '聯合新聞網';
-                if (hostname.includes('壹蘋新聞網')) return '壹蘋新聞網';
-                return hostname.replace('www.', '').split('.')[0];
-            } catch (e) {
-                return '原始媒體';
-            }
-        };
-
+        
         // 主要應用程式元件
         const App = () => {
             // 狀態管理
@@ -165,7 +153,6 @@
             const [isBrandsFiltered, setIsBrandsFiltered] = useState(true);
             const [wordCount, setWordCount] = useState(300);
             const [paragraphCount, setParagraphCount] = useState(5);
-            const [newsLink, setNewsLink] = useState('');
             const [celebrityData, setCelebrityData] = useState({
                 name: '',
                 platform: '',
@@ -176,29 +163,15 @@
             });
 
             // 處理 API 請求，整合瀏覽功能與重試機制
-            const handleAPIRequest = useCallback(async (prompt, schema, isExternalLink) => {
+            const handleAPIRequest = useCallback(async (prompt, schema) => {
                 setIsLoading(true);
                 setError(null);
                 setOutput('AI 正在努力生成中，請稍候...');
                 setOptimizedTitles(null);
                 
                 try {
-                    let finalPrompt = prompt;
-                    if (isExternalLink) {
-                        const source = newsLink;
-                        if (!source) throw new Error('請提供新聞連結！');
-                        
-                        // 瀏覽工具的 API 呼叫
-                        // 這裡使用一個假的 browsing.browse 函數來避免真正的網路請求，防止 403 錯誤
-                        const browsingResult = { text: '這是模擬的網頁內容' };
-                        
-                        const articleContent = browsingResult.text;
-                        const originalMediaName = getDomainName(source);
-                        finalPrompt = finalPrompt.replace('{articleContent}', articleContent).replace('{originalMediaName}', originalMediaName);
-                    }
-
                     const payload = {
-                        contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+                        contents: [{ role: "user", parts: [{ text: prompt }] }],
                         generationConfig: {
                             responseMimeType: "application/json",
                             responseSchema: schema
@@ -259,7 +232,7 @@
                 } finally {
                     setIsLoading(false);
                 }
-            }, [newsLink]);
+            }, []);
 
             // 所有功能的通用 JSON Schema
             const commonSchema = {
@@ -293,8 +266,7 @@
             // 根據不同 Tab 觸發不同的功能
             const handleSubmit = useCallback(async () => {
                 let prompt = '';
-                let schema = commonSchema;
-                let isExternalLink = false;
+                const schema = commonSchema;
 
                 const basePrompt = `請根據ETtoday新聞雲星光雲的寫作風格，以台灣繁體中文撰寫一篇新聞。
                     請注意，如果原稿中有提到品牌名稱，請不要寫到，並使用中性詞彙替換。
@@ -323,19 +295,6 @@
                         ${inputContent}
                         `;
                         break;
-                    case 'link-rewrite':
-                    case 'foreign-rewrite':
-                        if (!newsLink.trim()) { setError('請輸入新聞連結！'); return; }
-                        const foreignPrompt = activeTab === 'foreign-rewrite' ? '這是一個外電新聞連結，請翻譯成中文並改寫。' : '';
-                        prompt = `${basePrompt}
-                        ${foreignPrompt}
-                        請根據以下連結的內容進行改寫，避免抄襲。
-                        **請在第二段的開頭寫上：**根據{originalMediaName}報導。
-                        新聞連結內容：
-                        {articleContent}
-                        `;
-                        isExternalLink = true;
-                        break;
                     case 'social-to-news':
                         if (!celebrityData.name || !celebrityData.content) { setError('請填寫藝人名稱和社群文章內容！'); return; }
                         prompt = `${basePrompt}
@@ -352,7 +311,7 @@
                     default: return;
                 }
 
-                const result = await handleAPIRequest(prompt, schema, isExternalLink);
+                const result = await handleAPIRequest(prompt, schema);
 
                 if (result) {
                     setOutput(result.rewrittenText);
@@ -361,15 +320,13 @@
                     setOutput(`功能執行失敗，錯誤：${error}`);
                     setOptimizedTitles(null);
                 }
-            }, [activeTab, inputContent, wordCount, paragraphCount, newsLink, celebrityData, isBrandsFiltered, handleAPIRequest, error]);
+            }, [activeTab, inputContent, wordCount, paragraphCount, celebrityData, isBrandsFiltered, handleAPIRequest, error]);
 
             // 根據不同 Tab 取得 UI 內容
             const getTabContent = useCallback(() => {
                 switch (activeTab) {
                     case 'highlights': return { inputLabel: "新聞重點內容:", inputPlaceholder: "請輸入採訪重點或是條列式內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（生成新聞）" };
                     case 'rewrite': return { inputLabel: "通稿內容:", inputPlaceholder: "請輸入需要改寫的通稿內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（改寫）" };
-                    case 'link-rewrite': return { inputLabel: "新聞連結:", inputPlaceholder: "請輸入需要改寫的國內新聞連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（連結改寫）" };
-                    case 'foreign-rewrite': return { inputLabel: "外電新聞連結:", inputPlaceholder: "請輸入需要翻譯與改寫的外電新聞連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（外電改寫）" };
                     case 'social-to-news': return { inputLabel: "社群文章內容:", inputPlaceholder: "請輸入藝人社群文章內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（社群轉新聞）" };
                     default: return {};
                 }
@@ -417,7 +374,9 @@
                 React.createElement('div', { className: "w-full max-w-6xl container-card rounded-3xl overflow-hidden" },
                     React.createElement('div', { className: "p-8 border-b border-[#E0E0E0] bg-white" },
                         React.createElement('div', { className: "flex items-center space-x-4 mb-2" },
-                             React.createElement('img', { src: "https://i.imgur.com/gK6B4t4.png", alt: "ETtoday Logo", className: "h-12 w-auto" }),
+                            React.createElement('div', { className: "h-12 w-12 bg-[var(--primary-blue)] flex items-center justify-center rounded-xl" }, 
+                                React.createElement('span', { className: "text-white text-2xl font-black tracking-widest" }, "ET")
+                            ),
                              React.createElement('h3', { className: "text-3xl font-bold text-[var(--primary-blue)]" }, "AI 新聞小幫手")
                         ),
                         React.createElement('p', { className: "text-base text-gray-500" }, "整合多項新聞生成功能，讓您的內容創作更有效率。")
@@ -426,21 +385,19 @@
                     React.createElement('div', { className: "p-6 sm:p-8" },
                         // 按鈕區塊 - 重新設計為水平置中
                         React.createElement('div', { className: "flex flex-wrap justify-center gap-4 mb-8 p-2 rounded-full bg-[#E8F5FD] shadow-inner" },
-                            ['highlights', 'rewrite', 'link-rewrite', 'foreign-rewrite', 'social-to-news'].map(tab => (
+                            ['highlights', 'rewrite', 'social-to-news'].map(tab => (
                                 React.createElement('button', {
                                     key: tab,
                                     className: classNames(
                                         "flex items-center px-6 py-3 text-sm font-semibold rounded-full tab-button",
                                         activeTab === tab ? "active" : "text-gray-600"
                                     ),
-                                    onClick: () => { setActiveTab(tab); setError(null); setOptimizedTitles(null); setOutput(''); setInputContent(''); setNewsLink(''); setCelebrityData({ name: '', platform: '', content: '', imageDesc: '', link: '', notes: '' }); }
+                                    onClick: () => { setActiveTab(tab); setError(null); setOptimizedTitles(null); setOutput(''); setInputContent(''); setCelebrityData({ name: '', platform: '', content: '', imageDesc: '', link: '', notes: '' }); }
                                 },
                                     tab === 'highlights' && React.createElement(MessageSquare, { className: "mr-2 h-4 w-4" }),
                                     tab === 'rewrite' && React.createElement(PenTool, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'link-rewrite' && React.createElement(Link, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'foreign-rewrite' && React.createElement(FileText, { className: "mr-2 h-4 w-4" }),
                                     tab === 'social-to-news' && React.createElement(User, { className: "mr-2 h-4 w-4" }),
-                                    tab === 'highlights' ? "重點轉新聞" : tab === 'rewrite' ? "通稿改寫" : tab === 'link-rewrite' ? "國內連結改寫" : tab === 'foreign-rewrite' ? "外電新聞改寫" : "社群轉新聞"
+                                    tab === 'highlights' ? "重點轉新聞" : tab === 'rewrite' ? "通稿改寫" : "社群轉新聞"
                                 )
                             ))
                         ),
@@ -493,20 +450,6 @@
                                                 }),
                                                 React.createElement('label', { htmlFor: "isBrandsFiltered", className: "text-sm text-gray-700" }, "是否過濾品牌名稱")
                                             )
-                                        )
-                                    )
-                                ),
-                                (activeTab === 'link-rewrite' || activeTab === 'foreign-rewrite') && (
-                                    React.createElement('div', { className: "space-y-4" },
-                                        React.createElement('div', { className: "space-y-2" },
-                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, content.inputLabel),
-                                            React.createElement('input', {
-                                                type: 'url',
-                                                className: "input-field w-full p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
-                                                placeholder: content.inputPlaceholder,
-                                                value: newsLink,
-                                                onChange: (e) => setNewsLink(e.target.value)
-                                            })
                                         )
                                     )
                                 ),
@@ -605,7 +548,7 @@
                             React.createElement('button', {
                                 className: "w-full flex items-center justify-center p-4 font-semibold rounded-lg text-white submit-button hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                                 onClick: handleSubmit,
-                                disabled: isLoading || (!inputContent.trim() && !newsLink.trim() && (activeTab !== 'social-to-news' || !celebrityData.content))
+                                disabled: isLoading || (!inputContent.trim() && (activeTab !== 'social-to-news' || !celebrityData.content))
                             },
                                 isLoading && React.createElement(Loader, { className: "mr-2 h-5 w-5 animate-spin" }),
                                 content.buttonText
