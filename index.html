@@ -1,1132 +1,628 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 新聞助理</title>
-    <!-- 引入 Tailwind CSS -->
+    <title>ETtoday AI 新聞小幫手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 設置全局字體和背景顏色 */
+        /* ETtoday 品牌色 */
+        :root {
+            --primary-blue: #3B427F;
+            --secondary-orange: #F47920;
+            --secondary-yellow: #F9BA1D;
+            --secondary-light-blue: #67BCD2;
+            --background-light: #F0F2F5;
+            --card-light: #FFFFFF;
+            --text-dark: #333333;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f9fc;
-            color: #333;
+            background-color: var(--background-light);
+            color: var(--text-dark);
         }
-
-        /* 讓主內容區塊有彈性佈局 */
-        .main-container {
-            display: flex;
-            min-height: 100vh;
+        .container-card {
+            background-color: var(--card-light);
+            border: 1px solid #E0E0E0;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
         }
-
-        /* 側邊導航欄樣式 */
-        .nav-menu-sidebar {
-            width: 280px;
-            background-color: #fff;
-            padding: 1.5rem;
+        .input-area, .output-area {
+            background-color: var(--card-light);
+        }
+        .input-field, .output-field {
+            background-color: #F8F9FA;
+            border: 1px solid #E0E0E0;
+            color: var(--text-dark);
+        }
+        .output-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .output-scroll::-webkit-scrollbar-track {
+            background: #E0E0E0;
+            border-radius: 10px;
+        }
+        .output-scroll::-webkit-scrollbar-thumb {
+            background: #BDBDBD;
+            border-radius: 10px;
+        }
+        .output-scroll::-webkit-scrollbar-thumb:hover {
+            background: #A0A0A0;
+        }
+        .custom-message-box {
             position: fixed;
-            height: 100%;
-            overflow-y: auto;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        }
-
-        .nav-menu-sidebar h1 {
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .nav-menu-sidebar h1 a {
-            color: #1e3a8a;
-            font-weight: 700;
-        }
-
-        .nav-menu-sidebar a {
-            display: block;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 0.5rem;
-            color: #4a5568;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .nav-menu-sidebar a:hover {
-            background-color: #e2e8f0;
-            color: #2d3748;
-        }
-
-        .nav-menu-sidebar a.active {
-            background-color: #3b82f6;
-            color: #fff;
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4), 0 2px 4px -1px rgba(59, 130, 246, 0.2);
-        }
-
-        /* 主要內容區塊樣式 */
-        .content-area {
-            margin-left: 280px; /* 留出側邊欄的空間 */
-            flex-grow: 1;
-            padding: 2rem;
-            max-width: 1000px;
-            margin-right: auto;
-            margin-left: 280px;
-        }
-
-        .tool-section {
-            background-color: #fff;
-            padding: 2.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-            margin-bottom: 2rem;
-        }
-
-        .tool-section h2 {
-            font-size: 1.875rem;
-            font-weight: 700;
-            color: #1a202c;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .tool-section label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #4a5568;
-        }
-
-        .tool-section input,
-        .tool-section textarea,
-        .tool-section select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            background-color: #f7fafc;
-            transition: all 0.2s ease;
-        }
-
-        .tool-section input:focus,
-        .tool-section textarea:focus,
-        .tool-section select:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-        }
-
-        .tool-section textarea {
-            min-height: 200px;
-        }
-        
-        .grid-container {
-            display: grid;
-            gap: 1rem;
-            grid-template-columns: repeat(2, 1fr);
-        }
-        
-        @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* 按鈕樣式 */
-        .btn-primary {
-            background-color: #3b82f6;
-            color: #fff;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4), 0 2px 4px -1px rgba(59, 130, 246, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary:hover {
-            background-color: #2563eb;
-            transform: translateY(-2px);
-        }
-
-        .btn-primary:disabled {
-            background-color: #93c5fd;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-secondary {
-            background-color: #e2e8f0;
-            color: #4a5568;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-secondary:hover {
-            background-color: #cbd5e1;
-            transform: translateY(-2px);
-        }
-
-        .copy-button {
-            margin-left: 0.5rem;
-            background-color: #4a5568;
-            color: #fff;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            transition: background-color 0.2s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .copy-button:hover {
-            background-color: #2d3748;
-        }
-
-        /* 優化標題列表 */
-        .optimized-titles-list {
-            margin-top: 1rem;
-            padding-left: 1.5rem;
-            list-style-type: none;
-        }
-
-        .optimized-titles-list li {
-            margin-bottom: 0.5rem;
-            background-color: #f0f4f8;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            border-left: 4px solid #3b82f6;
-        }
-        
-        .optimized-titles-list li strong {
-            color: #1a202c;
-        }
-        
-        /* 歷史記錄區塊 */
-        .history-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        
-        .history-item {
-            background-color: #f0f4f8;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 0.5rem;
-        }
-        
-        .history-header span {
-            font-weight: 600;
-            color: #2d3748;
-        }
-        
-        .history-content-preview {
-            font-size: 0.875rem;
-            color: #718096;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .history-actions button {
-            background-color: #4a5568;
-            color: #fff;
-            border: none;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        
-        .history-actions button:hover {
-            background-color: #2d3748;
-        }
-
-        .corrected-text-display {
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.5rem;
-            background-color: #f7fafc;
-            min-height: 150px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .error-highlight {
-            background-color: #fde68a;
-            border-bottom: 2px solid #fbbf24;
-            padding: 2px;
-            border-radius: 4px;
-        }
-
-        /* 載入動畫 */
-        .loading-spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #3b82f6;
-            animation: spin 1s ease infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* 自定義彈窗樣式 */
-        .modal-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: none; /* 預設隱藏 */
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 2rem;
-            border-radius: 1rem;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            text-align: center;
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            font-size: 1rem;
+            font-weight: 600;
         }
-
-        .modal-buttons {
-            margin-top: 1.5rem;
+        .custom-message-box.show {
+            display: block;
+            opacity: 1;
         }
-
-        /* RWD 響應式調整 */
-        @media (max-width: 1024px) {
-            .nav-menu-sidebar {
-                width: 250px;
-                padding: 1rem;
-            }
-
-            .content-area {
-                margin-left: 250px;
-                padding: 1.5rem;
-            }
+        /* 美化 input range */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--secondary-orange);
+            cursor: pointer;
+            border-radius: 9999px;
+            box-shadow: 0 0 0 2px rgba(244, 121, 32, 0.5);
+            transition: all 0.2s ease-in-out;
         }
-        
-        @media (max-width: 768px) {
-            .nav-menu-sidebar {
-                position: relative;
-                width: 100%;
-                height: auto;
-                box-shadow: none;
-            }
-            
-            .content-area {
-                margin-left: 0;
-            }
-            
-            .main-container {
-                flex-direction: column;
-            }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--secondary-orange);
+            cursor: pointer;
+            border-radius: 9999px;
+            box-shadow: 0 0 0 2px rgba(244, 121, 32, 0.5);
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-button {
+            transition: all 0.3s ease-in-out;
+            transform: scale(1);
+        }
+        .tab-button.active {
+            background-color: var(--secondary-light-blue);
+            color: white;
+            box-shadow: 0 4px 15px rgba(103, 188, 210, 0.4);
+            transform: scale(1.05);
+        }
+        .tab-button:not(.active):hover {
+            background-color: #E8F5FD;
+            color: var(--secondary-light-blue);
+        }
+        .submit-button {
+            background-color: var(--primary-blue);
+        }
+        .submit-button:hover {
+            background-color: #2F3560;
+        }
+        .title-card {
+            background-color: #F8F9FA;
+            border: 1px solid #E0E0E0;
         }
     </style>
 </head>
-<body>
-    <div class="main-container">
-        <!-- 側邊導航欄 -->
-        <nav class="nav-menu-sidebar">
-            <h1 class="text-3xl font-extrabold text-center mb-6"><a href="#">AI新聞助理</a></h1>
-            <ul class="space-y-2">
-                <li><a href="#news-from-points">新聞重點產出新聞</a></li>
-                <li><a href="#rewrite-url-section">新聞連結改寫</a></li>
-                <li><a href="#foreign-news-section">外電新聞翻譯與改寫</a></li>
-                <li><a href="#rewrite-draft-section">新聞稿改寫</a></li>
-                <li><a href="#social-to-news-section">名人社群文章轉新聞</a></li>
-                <li><a href="#youtube-to-news-section">YouTube 連結轉新聞</a></li>
-                <li><a href="#proofread-section">錯字校正與語法檢查</a></li>
-                <li><a href="#history-section">歷史記錄</a></li>
-            </ul>
-        </nav>
+<body class="bg-[var(--background-light)] p-4 sm:p-8 text-[var(--text-dark)]">
+    <div id="root"></div>
+    <div id="message-box" class="custom-message-box"></div>
+    <script type="module">
+        import React from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+        const { useState, useCallback, useEffect } = React;
+        import { ClipboardCopy, Loader, XCircle, PenTool, FileText, MessageSquare, Link, User, Star } from 'https://esm.sh/lucide-react@0.395.0';
 
-        <!-- 主要內容區塊 -->
-        <main class="content-area">
-            <!-- 新聞重點產出新聞 -->
-            <section id="news-from-points" class="tool-section">
-                <h2>新聞重點產出新聞</h2>
-                <div class="grid-container">
-                    <div>
-                        <label for="newsTitle">標題:</label>
-                        <input type="text" id="newsTitle" placeholder="請輸入新聞標題 (選填)">
-                        <label for="newsContent">新聞重點 (條列式):</label>
-                        <textarea id="newsContent" rows="10" placeholder="請在此輸入條列式的新聞重點..."></textarea>
-                    </div>
-                    <div>
-                        <label for="minLength">新聞稿最短字數 (選填):</label>
-                        <input type="number" id="minLength" placeholder="請輸入數字">
-                        <label for="maxLength">新聞稿最長字數 (選填):</label>
-                        <input type="number" id="maxLength" placeholder="請輸入數字">
-                        <label for="numParagraphs">段落數 (選填):</label>
-                        <input type="number" id="numParagraphs" placeholder="請輸入數字">
-                        <label for="toneSelect">語氣:</label>
-                        <select id="toneSelect">
-                            <option value="objective">客觀</option>
-                            <option value="lively">活潑</option>
-                            <option value="formal">正式</option>
-                        </select>
-                    </div>
-                </div>
-                <button id="generateNewsBtn" class="btn-primary w-full mt-4">生成新聞稿</button>
-                <div class="mt-8">
-                    <label>生成的 AI 新聞稿
-                        <button class="copy-button" data-target="generatedNewsOutput">複製</button>
-                    </label>
-                    <textarea id="generatedNewsOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="generatedNewsOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- 新聞連結改寫 -->
-            <section id="rewrite-url-section" class="tool-section">
-                <h2>新聞連結改寫</h2>
-                <label for="rewriteUrlInput">原始新聞連結:</label>
-                <input type="url" id="rewriteUrlInput" placeholder="請輸入新聞連結...">
-                <button id="rewriteUrlBtn" class="btn-primary w-full">改寫新聞</button>
-                <div class="mt-8">
-                    <label>改寫後的 AI 新聞稿
-                        <button class="copy-button" data-target="rewrittenUrlOutput">複製</button>
-                    </label>
-                    <textarea id="rewrittenUrlOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="rewrittenUrlOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-            
-            <!-- 新聞稿改寫 -->
-            <section id="rewrite-draft-section" class="tool-section">
-                <h2>新聞稿改寫</h2>
-                <label for="newsDraftInput">新聞稿內容:</label>
-                <textarea id="newsDraftInput" rows="10" placeholder="請輸入需要改寫的新聞稿內容..."></textarea>
-                <div class="flex items-center space-x-2 mt-4 mb-4">
-                    <input type="checkbox" id="isBrandsFiltered" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                    <label for="isBrandsFiltered" class="font-normal text-gray-700">是否需要過濾品牌名稱</label>
-                </div>
-                <button id="rewriteNewsDraftBtn" class="btn-primary w-full">改寫新聞稿</button>
-                <div class="mt-8">
-                    <label>改寫後的 AI 新聞稿
-                        <button class="copy-button" data-target="rewrittenNewsDraftOutput">複製</button>
-                    </label>
-                    <textarea id="rewrittenNewsDraftOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="rewrittenNewsDraftOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- 外電新聞翻譯與改寫 -->
-            <section id="foreign-news-section" class="tool-section">
-                <h2>外電新聞翻譯與改寫</h2>
-                <label for="foreignNewsUrlInput">外電新聞連結:</label>
-                <input type="url" id="foreignNewsUrlInput" placeholder="請輸入外電新聞連結...">
-                <label for="sourceLanguageSelect">原始語言:</label>
-                <select id="sourceLanguageSelect">
-                    <option value="en">英文 (English)</option>
-                    <option value="ja">日文 (Japanese)</option>
-                    <option value="ko">韓文 (Korean)</option>
-                </select>
-                <button id="translateRewriteBtn" class="btn-primary w-full mt-4">翻譯並改寫</button>
-                <div class="mt-8">
-                    <label>翻譯並改寫後的 AI 新聞稿
-                        <button class="copy-button" data-target="translatedRewrittenOutput">複製</button>
-                    </label>
-                    <textarea id="translatedRewrittenOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="translatedRewrittenOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- 名人社群文章轉新聞 -->
-            <section id="social-to-news-section" class="tool-section">
-                <h2>名人社群文章轉新聞</h2>
-                <label for="celebrityNameInput">藝人名稱:</label>
-                <input type="text" id="celebrityNameInput" placeholder="請輸入藝人名稱 (必填)">
-                <label for="socialPlatformSelect">社群平台:</label>
-                <select id="socialPlatformSelect">
-                    <option value="instagram">Instagram</option>
-                    <option value="facebook">Facebook</option>
-                </select>
-                <label for="socialPostContent">社群文章內容:</label>
-                <textarea id="socialPostContent" rows="5" placeholder="請輸入社群文章內容 (必填)"></textarea>
-                <label for="mediaDescriptionInput">配圖描述:</label>
-                <input type="text" id="mediaDescriptionInput" placeholder="請描述文章配圖 (選填)">
-                <label for="originalSocialLinkInput">原始社群連結:</label>
-                <input type="url" id="originalSocialLinkInput" placeholder="請輸入原始社群連結 (選填)">
-                <label for="socialRemarkInput">補充說明:</label>
-                <textarea id="socialRemarkInput" rows="3" placeholder="請提供其他補充說明... (選填)"></textarea>
-                <button id="generateSocialNewsBtn" class="btn-primary w-full mt-4">生成新聞稿</button>
-                <div class="mt-8">
-                    <label>生成的 AI 新聞稿
-                        <button class="copy-button" data-target="generatedSocialNewsOutput">複製</button>
-                    </label>
-                    <textarea id="generatedSocialNewsOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="generatedSocialNewsOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- YouTube 連結轉新聞 -->
-            <section id="youtube-to-news-section" class="tool-section">
-                <h2>YouTube 連結轉新聞</h2>
-                <label for="youtubeUrlInput">YouTube 連結:</label>
-                <input type="url" id="youtubeUrlInput" placeholder="請輸入 YouTube 影片連結...">
-                <button id="generateYoutubeNewsBtn" class="btn-primary w-full">生成新聞</button>
-                <div class="mt-8">
-                    <label>生成的 AI 新聞稿
-                        <button class="copy-button" data-target="generatedYoutubeNewsOutput">複製</button>
-                    </label>
-                    <textarea id="generatedYoutubeNewsOutput" rows="10" readonly></textarea>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="generatedYoutubeNewsOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- 錯字校正與語法檢查 -->
-            <section id="proofread-section" class="tool-section">
-                <h2>錯字校正與語法檢查</h2>
-                <label for="proofreadTextInput">輸入欲校正的文字:</label>
-                <textarea id="proofreadTextInput" rows="10" placeholder="請輸入需要校正的文字..."></textarea>
-                <button id="proofreadTextBtn" class="btn-primary w-full">校正文字</button>
-                <div class="mt-8">
-                    <label>校正後的文字
-                        <button class="copy-button" data-target="correctedTextOutput">複製</button>
-                    </label>
-                    <div id="correctedTextOutput" class="corrected-text-display">校正結果將會顯示在此...</div>
-                </div>
-                <div class="mt-4">
-                    <label>優化後的標題：</label>
-                    <ul id="correctedTextOptimizedTitles" class="optimized-titles-list">
-                        <li>無建議標題。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- 歷史記錄 -->
-            <section id="history-section" class="tool-section">
-                <h2>歷史記錄</h2>
-                <div id="historyList" class="history-list">
-                    <!-- 歷史記錄項目將由 JavaScript 動態生成 -->
-                </div>
-            </section>
-        </main>
-    </div>
-    
-    <!-- 自定義彈窗 -->
-    <div id="custom-modal" class="modal-container">
-        <div class="modal-content">
-            <p id="modal-message"></p>
-            <div class="modal-buttons">
-                <button id="modal-confirm-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2 hidden">確定</button>
-                <button id="modal-cancel-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">關閉</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 腳本 -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 獲取所有元素
-            const newsContent = document.getElementById('newsContent');
-            const newsTitle = document.getElementById('newsTitle');
-            const minLength = document.getElementById('minLength');
-            const maxLength = document.getElementById('maxLength');
-            const numParagraphs = document.getElementById('numParagraphs');
-            const toneSelect = document.getElementById('toneSelect');
-            const generateNewsBtn = document.getElementById('generateNewsBtn');
-            const generatedNewsOutput = document.getElementById('generatedNewsOutput');
-            const generatedNewsOptimizedTitles = document.getElementById('generatedNewsOptimizedTitles');
-
-            const rewriteUrlInput = document.getElementById('rewriteUrlInput');
-            const rewriteUrlBtn = document.getElementById('rewriteUrlBtn');
-            const rewrittenUrlOutput = document.getElementById('rewrittenUrlOutput');
-            const rewrittenUrlOptimizedTitles = document.getElementById('rewrittenUrlOptimizedTitles');
-
-            const newsDraftInput = document.getElementById('newsDraftInput');
-            const rewriteNewsDraftBtn = document.getElementById('rewriteNewsDraftBtn');
-            const rewrittenNewsDraftOutput = document.getElementById('rewrittenNewsDraftOutput');
-            const rewrittenNewsDraftOptimizedTitles = document.getElementById('rewrittenNewsDraftOptimizedTitles');
-            const isBrandsFiltered = document.getElementById('isBrandsFiltered');
-
-            const foreignNewsUrlInput = document.getElementById('foreignNewsUrlInput');
-            const sourceLanguageSelect = document.getElementById('sourceLanguageSelect');
-            const translateRewriteBtn = document.getElementById('translateRewriteBtn');
-            const translatedRewrittenOutput = document.getElementById('translatedRewrittenOutput');
-            const translatedRewrittenOptimizedTitles = document.getElementById('translatedRewrittenOptimizedTitles');
-
-            const celebrityNameInput = document.getElementById('celebrityNameInput');
-            const socialPlatformSelect = document.getElementById('socialPlatformSelect');
-            const socialPostContent = document.getElementById('socialPostContent');
-            const mediaDescriptionInput = document.getElementById('mediaDescriptionInput');
-            const originalSocialLinkInput = document.getElementById('originalSocialLinkInput');
-            const socialRemarkInput = document.getElementById('socialRemarkInput');
-            const generateSocialNewsBtn = document.getElementById('generateSocialNewsBtn');
-            const generatedSocialNewsOutput = document.getElementById('generatedSocialNewsOutput');
-            const generatedSocialNewsOptimizedTitles = document.getElementById('generatedSocialNewsOptimizedTitles');
-
-            const youtubeUrlInput = document.getElementById('youtubeUrlInput');
-            const generateYoutubeNewsBtn = document.getElementById('generateYoutubeNewsBtn');
-            const generatedYoutubeNewsOutput = document.getElementById('generatedYoutubeNewsOutput');
-            const generatedYoutubeNewsOptimizedTitles = document.getElementById('generatedYoutubeNewsOptimizedTitles');
-
-            const proofreadTextInput = document.getElementById('proofreadTextInput');
-            const proofreadTextBtn = document.getElementById('proofreadTextBtn');
-            const correctedTextOutput = document.getElementById('correctedTextOutput');
-            const correctedTextOptimizedTitles = document.getElementById('correctedTextOptimizedTitles');
-
-            const historyList = document.getElementById('historyList');
-
-            // 自定義彈窗功能，取代 alert 和 confirm
-            const showModal = (message, type = 'alert', callback = () => {}) => {
-                const modalId = 'custom-modal';
-                const modal = document.getElementById(modalId);
-                
-                document.getElementById('modal-message').textContent = message;
-                const confirmBtn = document.getElementById('modal-confirm-btn');
-                const cancelBtn = document.getElementById('modal-cancel-btn');
-                
-                const confirmHandler = () => {
-                    callback(true);
-                    modal.style.display = 'none';
-                    confirmBtn.removeEventListener('click', confirmHandler);
-                };
-
-                const cancelHandler = () => {
-                    if (type === 'confirm') {
-                        callback(false);
-                    }
-                    modal.style.display = 'none';
-                    cancelBtn.removeEventListener('click', cancelHandler);
-                };
-
-                confirmBtn.removeEventListener('click', confirmHandler);
-                cancelBtn.removeEventListener('click', cancelHandler);
-                
-                confirmBtn.addEventListener('click', confirmHandler);
-                cancelBtn.addEventListener('click', cancelHandler);
-
-                if (type === 'confirm') {
-                    confirmBtn.classList.remove('hidden');
-                    cancelBtn.textContent = '取消';
-                } else {
-                    confirmBtn.classList.add('hidden');
-                    cancelBtn.textContent = '關閉';
-                }
-                
-                modal.style.display = 'flex';
-            };
-
-
-            // 歷史記錄功能
-            let history = JSON.parse(localStorage.getItem('aiNewsHistory')) || [];
-
-            const saveHistory = () => {
-                localStorage.setItem('aiNewsHistory', JSON.stringify(history));
-                renderHistory();
-            };
-
-            function unescapeHtml(text) {
-                if (typeof text !== 'string') {
-                    return String(text || '');
-                }
-                let unescapedText = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                const doc = new DOMParser().parseFromString(unescapedText, 'text/html');
-                return doc.documentElement.textContent;
+        // 輔助函數：條件式 className
+        function classNames(...classes) {
+            return classes.filter(Boolean).join(' ');
+        }
+        // 輔助函數：顯示自定義訊息框
+        const showMessage = (message, duration = 3000) => {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        };
+        // 輔助函數：從 URL 獲取媒體名稱
+        const getDomainName = (url) => {
+            try {
+                const urlObj = new URL(url);
+                const hostname = urlObj.hostname;
+                if (hostname.includes('聯合新聞網')) return '聯合新聞網';
+                if (hostname.includes('壹蘋新聞網')) return '壹蘋新聞網';
+                return hostname.replace('www.', '').split('.')[0];
+            } catch (e) {
+                return '原始媒體';
             }
+        };
 
-            function formatProofreadText(text) {
-                if (typeof text !== 'string') return String(text || '');
-                const regex = /([\u4e00-\u9fa5a-zA-Z0-9_]+)[\(\uff08]([\u4e00-\u9fa5a-zA-Z0-9_]+)[\)\uff09]/g;
-                let resultHtml = '';
-                let lastIndex = 0;
-                let match;
+        // 主要應用程式元件
+        const App = () => {
+            // 狀態管理
+            const [activeTab, setActiveTab] = useState('highlights');
+            const [inputContent, setInputContent] = useState('');
+            const [output, setOutput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const [optimizedTitles, setOptimizedTitles] = useState(null);
+            const [isBrandsFiltered, setIsBrandsFiltered] = useState(true);
+            const [wordCount, setWordCount] = useState(300);
+            const [paragraphCount, setParagraphCount] = useState(5);
+            const [newsLink, setNewsLink] = useState('');
+            const [celebrityData, setCelebrityData] = useState({
+                name: '',
+                platform: '',
+                content: '',
+                imageDesc: '',
+                link: '',
+                notes: '',
+            });
 
-                while ((match = regex.exec(text)) !== null) {
-                    resultHtml += unescapeHtml(text.substring(lastIndex, match.index));
-                    const errorWord = match[1];
-                    const correctedWord = match[2];
-                    if (errorWord && correctedWord) {
-                        resultHtml += `<span class="error-highlight">${unescapeHtml(errorWord)}</span>（${unescapeHtml(correctedWord)}）`;
-                    } else {
-                        resultHtml += unescapeHtml(match[0]);
-                    }
-                    lastIndex = regex.lastIndex;
-                }
-
-                resultHtml += unescapeHtml(text.substring(lastIndex));
-                return resultHtml;
-            }
-
-            const renderHistory = () => {
-                historyList.innerHTML = '';
-                if (history.length === 0) {
-                    historyList.innerHTML = '<p>尚無歷史記錄。</p>';
-                    return;
-                }
-                history.forEach((item, index) => {
-                    const historyItem = document.createElement('div');
-                    historyItem.classList.add('history-item');
-
-                    let displayContent = '';
-                    if (item.content && item.content.content) {
-                        const innerContent = item.content.content;
-                        displayContent = innerContent.rewrittenText || innerContent.generatedText || innerContent.translatedRewrittenText || innerContent.celebrityNewsText || innerContent.newsContent || innerContent.correctedText;
-                    } else {
-                        displayContent = '內容無效或空白';
-                    }
-
-                    let previewHtml = '';
-                    if (item.type === '錯字校正與語法檢查') {
-                        const plainTextPreview = unescapeHtml(displayContent).substring(0, 100).replace(/\n/g, ' ') + (displayContent.length > 100 ? '...' : '');
-                        previewHtml = plainTextPreview;
-                    } else {
-                        previewHtml = unescapeHtml(displayContent).substring(0, 100).replace(/\n/g, ' ') + (displayContent.length > 100 ? '...' : '');
-                    }
-
-                    historyItem.innerHTML = `
-                        <div class="history-header">
-                            <span>${item.type} (${new Date(item.timestamp).toLocaleString()})</span>
-                            <div class="history-actions">
-                                <button class="copy-btn" data-index="${index}">複製</button>
-                                <button class="delete-btn" data-index="${index}">刪除</button>
-                            </div>
-                        </div>
-                        <div class="history-content-preview">
-                            ${previewHtml}
-                        </div>
-                    `;
-                    historyList.appendChild(historyItem);
-                });
-
-                document.querySelectorAll('.copy-btn').forEach(button => {
-                    button.onclick = (e) => {
-                        const index = e.target.dataset.index;
-                        let textToCopy = '';
-                        const itemContent = history[index].content && history[index].content.content;
-
-                        if (itemContent) {
-                            textToCopy = itemContent.rewrittenText || itemContent.generatedText || itemContent.translatedRewrittenText || itemContent.celebrityNewsText || itemContent.newsContent || itemContent.correctedText;
-                        }
+            // 處理 API 請求，整合瀏覽功能與重試機制
+            const handleAPIRequest = useCallback(async (prompt, schema, isExternalLink) => {
+                setIsLoading(true);
+                setError(null);
+                setOutput('AI 正在努力生成中，請稍候...');
+                setOptimizedTitles(null);
+                
+                try {
+                    let finalPrompt = prompt;
+                    if (isExternalLink) {
+                        const source = newsLink;
+                        if (!source) throw new Error('請提供新聞連結！');
                         
-                        if (textToCopy) {
-                            textToCopy = unescapeHtml(textToCopy);
+                        // 瀏覽工具的 API 呼叫
+                        const browsingPayload = {
+                            query: `請抓取此網頁內容：${source}`,
+                            url: source
+                        };
+                        
+                        // 這是模擬瀏覽工具的非同步操作
+                        const browsingResult = await browsing.browse(browsingPayload.query, browsingPayload.url);
+                        if (!browsingResult) throw new Error('無法從連結中獲取內容，請檢查連結是否正確。');
+                        
+                        const articleContent = browsingResult.text;
+                        const originalMediaName = getDomainName(source);
+                        finalPrompt = finalPrompt.replace('{articleContent}', articleContent).replace('{originalMediaName}', originalMediaName);
+                    }
+
+                    const payload = {
+                        contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: schema
+                        }
+                    };
+
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                    
+                    let response;
+                    let result;
+                    let retries = 0;
+                    const maxRetries = 5;
+                    const initialDelay = 1000;
+
+                    while (retries < maxRetries) {
+                        try {
+                            response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (response.ok) {
+                                result = await response.json();
+                                break;
+                            } else if (response.status === 429) {
+                                const delay = initialDelay * Math.pow(2, retries);
+                                retries++;
+                                await new Promise(res => setTimeout(res, delay));
+                            } else {
+                                throw new Error(`API 請求失敗，狀態碼: ${response.status}`);
+                            }
+                        } catch (err) {
+                            if (retries < maxRetries - 1) {
+                                const delay = initialDelay * Math.pow(2, retries);
+                                retries++;
+                                await new Promise(res => setTimeout(res, delay));
+                            } else {
+                                throw err;
+                            }
+                        }
+                    }
+
+                    if (result && result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        
+                        const jsonText = result.candidates[0].content.parts[0].text;
+                        return JSON.parse(jsonText);
+                    } else {
+                        throw new Error("AI 返回的內容格式不正確，或內容遺失。");
+                    }
+                } catch (err) {
+                    console.error("API 呼叫時發生錯誤:", err);
+                    setError(err.message);
+                    return null;
+                } finally {
+                    setIsLoading(false);
+                }
+            }, [newsLink]);
+
+            // 所有功能的通用 JSON Schema
+            const commonSchema = {
+                type: "OBJECT",
+                properties: {
+                    "rewrittenText": { "type": "STRING" },
+                    "optimizedTitles": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "長標": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "正統": { "type": "STRING" },
+                                    "藏標": { "type": "STRING" },
+                                    "特別": { "type": "STRING" }
+                                }
+                            },
+                            "短標": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "正統": { "type": "STRING" },
+                                    "藏標": { "type": "STRING" },
+                                    "特別": { "type": "STRING" }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            // 根據不同 Tab 觸發不同的功能
+            const handleSubmit = useCallback(async () => {
+                let prompt = '';
+                let schema = commonSchema;
+                let isExternalLink = false;
+
+                const basePrompt = `請根據ETtoday新聞雲星光雲的寫作風格，以台灣繁體中文撰寫一篇新聞。
+                    請注意，如果原稿中有提到品牌名稱，請不要寫到，並使用中性詞彙替換。
+                    請提供三種不同風格的標題建議：正統、藏標和特別。
+                    每種風格的標題都要有兩種長度：
+                    一、長標，字數為 25-30字
+                    二、短標，字數為 15-20字
+                    請勿使用日期作為標題中的數字。`;
+
+                switch (activeTab) {
+                    case 'highlights':
+                        if (!inputContent.trim()) { setError('請輸入新聞重點！'); return; }
+                        prompt = `${basePrompt}
+                        請將以下重點內容撰寫成新聞稿，並指定文章字數為 ${wordCount} 字，段落數為 ${paragraphCount} 段。
+                        重點內容：
+                        ${inputContent}
+                        `;
+                        break;
+                    case 'rewrite':
+                        if (!inputContent.trim()) { setError('請輸入新聞稿內容！'); return; }
+                        const brandFilterText = isBrandsFiltered ? '請將品牌名稱濾掉，並使用通順的詞彙替代。' : '';
+                        prompt = `${basePrompt}
+                        ${brandFilterText}
+                        請將以下新聞稿進行改寫，語氣保持客觀，長度不變。
+                        新聞稿內容：
+                        ${inputContent}
+                        `;
+                        break;
+                    case 'link-rewrite':
+                    case 'foreign-rewrite':
+                        if (!newsLink.trim()) { setError('請輸入新聞連結！'); return; }
+                        const foreignPrompt = activeTab === 'foreign-rewrite' ? '這是一個外電新聞連結，請翻譯成中文並改寫。' : '';
+                        prompt = `${basePrompt}
+                        ${foreignPrompt}
+                        請根據以下連結的內容進行改寫，避免抄襲。
+                        **請在第二段的開頭寫上：**根據{originalMediaName}報導。
+                        新聞連結內容：
+                        {articleContent}
+                        `;
+                        isExternalLink = true;
+                        break;
+                    case 'social-to-news':
+                        if (!celebrityData.name || !celebrityData.content) { setError('請填寫藝人名稱和社群文章內容！'); return; }
+                        prompt = `${basePrompt}
+                        請將以下社群媒體內容撰寫成一篇新聞。
+                        藝人名稱：${celebrityData.name}
+                        社群平台：${celebrityData.platform}
+                        文章內容：
+                        ${celebrityData.content}
+                        ${celebrityData.imageDesc ? `配圖描述：${celebrityData.imageDesc}` : ''}
+                        ${celebrityData.link ? `原始社群連結：${celebrityData.link}` : ''}
+                        ${celebrityData.notes ? `補充說明：${celebrityData.notes}` : ''}
+                        `;
+                        break;
+                    default: return;
+                }
+
+                const result = await handleAPIRequest(prompt, schema, isExternalLink);
+
+                if (result) {
+                    setOutput(result.rewrittenText);
+                    setOptimizedTitles(result.optimizedTitles);
+                } else {
+                    setOutput(`功能執行失敗，錯誤：${error}`);
+                    setOptimizedTitles(null);
+                }
+            }, [activeTab, inputContent, wordCount, paragraphCount, newsLink, celebrityData, isBrandsFiltered, handleAPIRequest, error]);
+
+            // 根據不同 Tab 取得 UI 內容
+            const getTabContent = useCallback(() => {
+                switch (activeTab) {
+                    case 'highlights': return { inputLabel: "新聞重點內容:", inputPlaceholder: "請輸入採訪重點或是條列式內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（生成新聞）" };
+                    case 'rewrite': return { inputLabel: "通稿內容:", inputPlaceholder: "請輸入需要改寫的通稿內容...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（改寫）" };
+                    case 'link-rewrite': return { inputLabel: "新聞連結:", inputPlaceholder: "請輸入需要改寫的國內新聞連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（連結改寫）" };
+                    case 'foreign-rewrite': return { inputLabel: "外電新聞連結:", inputPlaceholder: "請輸入需要翻譯與改寫的外電新聞連結...", outputLabel: "改寫後的 AI 新聞稿", buttonText: "啟動（外電改寫）" };
+                    case 'social-to-news': return { inputLabel: "社群文章內容:", inputPlaceholder: "請輸入藝人社群文章內容...", outputLabel: "產出的 AI 新聞稿", buttonText: "啟動（社群轉新聞）" };
+                    default: return {};
+                }
+            }, [activeTab]);
+
+            const content = getTabContent();
+
+            // 複製功能
+            const copyToClipboard = useCallback((text) => {
+                if (text) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => showMessage('內容已複製到剪貼簿！'))
+                        .catch(err => {
                             const textarea = document.createElement('textarea');
-                            textarea.value = textToCopy;
+                            textarea.value = text;
                             document.body.appendChild(textarea);
                             textarea.select();
                             document.execCommand('copy');
                             document.body.removeChild(textarea);
-                            showModal('內容已複製到剪貼簿！');
-                        } else {
-                            showModal("無法複製內容");
-                        }
-                    };
-                });
-
-                document.querySelectorAll('.delete-btn').forEach(button => {
-                    button.onclick = (e) => {
-                        const index = e.target.dataset.index;
-                        showModal('確定要刪除這條歷史記錄嗎？', 'confirm', (result) => {
-                            if (result) {
-                                history.splice(index, 1);
-                                saveHistory();
-                            }
+                            showMessage('內容已複製到剪貼簿！');
                         });
-                    };
-                });
-            };
-
-            renderHistory();
-
-            function renderOptimizedTitles(ulElement, optimizedTitles) {
-                ulElement.innerHTML = '';
-                if (optimizedTitles && typeof optimizedTitles === 'object') {
-                    const keys = ['藏標', '正統', '特別'];
-                    keys.forEach(key => {
-                        const title = optimizedTitles[key];
-                        if (title) {
-                            const li = document.createElement('li');
-                            li.innerHTML = `<strong>${key}：</strong> ${unescapeHtml(title)}`;
-                            ulElement.appendChild(li);
-                        }
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = '無建議標題。';
-                    ulElement.appendChild(li);
                 }
-            }
+            }, []);
 
-            async function handleAIRequest(button, outputField, apiEndpoint, payload, titlesOutputElement) {
-                const backendUrl = 'https://my-news-assistant-backend.onrender.com';
-                const fullUrl = `${backendUrl}${apiEndpoint}`;
+            // 渲染標題建議卡片
+            const renderTitleCard = (titleType, titles) => (
+                React.createElement('div', { className: "title-card p-6 rounded-xl transition-all hover:border-[var(--secondary-orange)] transform hover:scale-[1.02]" },
+                    React.createElement('h4', { className: "text-lg font-bold text-[var(--text-dark)] mb-4 border-b border-[#E0E0E0] pb-2 flex items-center" }, 
+                        React.createElement(Star, { className: "h-5 w-5 mr-2 text-[var(--secondary-yellow)]" }),
+                        titleType
+                    ),
+                    React.createElement('ul', { className: "space-y-4" },
+                        Object.entries(titles).map(([key, value]) => (
+                            React.createElement('li', { key: key, className: "flex items-start text-gray-600 text-sm" },
+                                React.createElement('span', { className: "flex-shrink-0 font-bold text-[var(--primary-blue)] mr-2 min-w-[40px]" }, key + '：'),
+                                React.createElement('span', null, value)
+                            )
+                        ))
+                    )
+                )
+            );
 
-                button.disabled = true;
-                const originalButtonContent = button.innerHTML;
-                button.innerHTML = '<div class="loading-spinner"></div>';
-
-                if (outputField.id === 'correctedTextOutput') {
-                    outputField.innerHTML = '<p style="color: #666; margin-top: 1rem;">AI 正在努力生成中，請稍候...</p>';
-                } else {
-                    outputField.value = 'AI 正在努力生成中，請稍候...';
-                }
-
-                if (titlesOutputElement) {
-                    renderOptimizedTitles(titlesOutputElement, null);
-                }
-
-                try {
-                    console.log(`[Frontend Debug] Sending request to: ${fullUrl}`);
-                    console.log(`[Frontend Debug] Payload:`, payload);
-
-                    const response = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    console.log(`[Frontend Debug] Received response status: ${response.status}`);
-                    console.log(`[Frontend Debug] Received Content-Type: ${response.headers.get('Content-Type')}`);
+            // 主介面渲染
+            return React.createElement('div', { className: "min-h-screen flex items-center justify-center p-4 sm:p-8" },
+                React.createElement('div', { className: "w-full max-w-6xl container-card rounded-3xl overflow-hidden" },
+                    React.createElement('div', { className: "p-8 border-b border-[#E0E0E0] bg-white" },
+                        React.createElement('div', { className: "flex items-center space-x-4 mb-2" },
+                             React.createElement('img', { src: "https://i.imgur.com/W2dC2hN.png", alt: "ETtoday Logo", className: "h-12 w-auto" }),
+                             React.createElement('h3', { className: "text-3xl font-bold text-[var(--primary-blue)]" }, "AI 新聞小幫手")
+                        ),
+                        React.createElement('p', { className: "text-base text-gray-500" }, "整合多項新聞生成功能，讓您的內容創作更有效率。")
+                    ),
                     
-                    const contentType = response.headers.get('Content-Type');
-                    let data;
-                    if (contentType && contentType.includes('application/json')) {
-                        data = await response.json();
-                    } else {
-                        const text = await response.text();
-                        throw new Error(`伺服器沒有回傳有效的 JSON。回應狀態: ${response.status}。回應內容：${text.substring(0, 500)}...`);
-                    }
+                    React.createElement('div', { className: "p-6 sm:p-8" },
+                        // 按鈕區塊 - 重新設計為水平置中
+                        React.createElement('div', { className: "flex flex-wrap justify-center gap-4 mb-8 p-2 rounded-full bg-[#E8F5FD] shadow-inner" },
+                            ['highlights', 'rewrite', 'link-rewrite', 'foreign-rewrite', 'social-to-news'].map(tab => (
+                                React.createElement('button', {
+                                    key: tab,
+                                    className: classNames(
+                                        "flex items-center px-6 py-3 text-sm font-semibold rounded-full tab-button",
+                                        activeTab === tab ? "active" : "text-gray-600"
+                                    ),
+                                    onClick: () => { setActiveTab(tab); setError(null); setOptimizedTitles(null); setOutput(''); setInputContent(''); setNewsLink(''); setCelebrityData({ name: '', platform: '', content: '', imageDesc: '', link: '', notes: '' }); }
+                                },
+                                    tab === 'highlights' && React.createElement(MessageSquare, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'rewrite' && React.createElement(PenTool, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'link-rewrite' && React.createElement(Link, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'foreign-rewrite' && React.createElement(FileText, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'social-to-news' && React.createElement(User, { className: "mr-2 h-4 w-4" }),
+                                    tab === 'highlights' ? "重點轉新聞" : tab === 'rewrite' ? "通稿改寫" : tab === 'link-rewrite' ? "國內連結改寫" : tab === 'foreign-rewrite' ? "外電新聞改寫" : "社群轉新聞"
+                                )
+                            ))
+                        ),
 
-                    if (!response.ok) {
-                        throw new Error(data.error || `HTTP error! status: ${response.status}`);
-                    }
+                        React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-8" },
+                            // 左側輸入區
+                            React.createElement('div', { className: "input-area p-6 rounded-xl" },
+                                (activeTab === 'highlights' || activeTab === 'rewrite') && (
+                                    React.createElement('div', { className: "space-y-6" },
+                                        React.createElement('div', { className: "space-y-2" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, content.inputLabel),
+                                            React.createElement('textarea', {
+                                                className: "input-field w-full p-4 h-64 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: content.inputPlaceholder,
+                                                value: inputContent,
+                                                onChange: (e) => setInputContent(e.target.value)
+                                            })
+                                        ),
+                                        activeTab === 'highlights' && (
+                                            React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-4" },
+                                                React.createElement('div', { className: "space-y-2" },
+                                                    React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, `文章字數：${wordCount} 字`),
+                                                    React.createElement('input', {
+                                                        type: 'range',
+                                                        min: '100', max: '800', step: '50',
+                                                        value: wordCount,
+                                                        onChange: (e) => setWordCount(parseInt(e.target.value)),
+                                                        className: "w-full h-2 bg-[#E0E0E0] rounded-lg appearance-none cursor-pointer"
+                                                    })
+                                                ),
+                                                React.createElement('div', { className: "space-y-2" },
+                                                    React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, `段落數：${paragraphCount} 段`),
+                                                    React.createElement('input', {
+                                                        type: 'range',
+                                                        min: '2', max: '10', step: '1',
+                                                        value: paragraphCount,
+                                                        onChange: (e) => setParagraphCount(parseInt(e.target.value)),
+                                                        className: "w-full h-2 bg-[#E0E0E0] rounded-lg appearance-none cursor-pointer"
+                                                    })
+                                                )
+                                            )
+                                        ),
+                                        activeTab === 'rewrite' && (
+                                            React.createElement('div', { className: "flex items-center space-x-2" },
+                                                React.createElement('input', {
+                                                    type: 'checkbox', id: 'isBrandsFiltered',
+                                                    checked: isBrandsFiltered,
+                                                    onChange: (e) => setIsBrandsFiltered(e.target.checked),
+                                                    className: 'form-checkbox h-4 w-4 text-[var(--secondary-orange)] rounded-md bg-[#F8F9FA] border-[#E0E0E0] focus:ring-[var(--secondary-orange)] transition-all'
+                                                }),
+                                                React.createElement('label', { htmlFor: "isBrandsFiltered", className: "text-sm text-gray-700" }, "是否過濾品牌名稱")
+                                            )
+                                        )
+                                    )
+                                ),
+                                (activeTab === 'link-rewrite' || activeTab === 'foreign-rewrite') && (
+                                    React.createElement('div', { className: "space-y-4" },
+                                        React.createElement('div', { className: "space-y-2" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, content.inputLabel),
+                                            React.createElement('input', {
+                                                type: 'url',
+                                                className: "input-field w-full p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: content.inputPlaceholder,
+                                                value: newsLink,
+                                                onChange: (e) => setNewsLink(e.target.value)
+                                            })
+                                        )
+                                    )
+                                ),
+                                activeTab === 'social-to-news' && (
+                                    React.createElement('div', { className: "space-y-4" },
+                                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                            React.createElement('div', { className: "space-y-2" },
+                                                React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "藝人名稱"),
+                                                React.createElement('input', {
+                                                    type: 'text', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                    placeholder: "如：蔡依林", value: celebrityData.name,
+                                                    onChange: (e) => setCelebrityData({...celebrityData, name: e.target.value})
+                                                })
+                                            ),
+                                            React.createElement('div', { className: "space-y-2" },
+                                                React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "社群平台"),
+                                                React.createElement('input', {
+                                                    type: 'text', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                    placeholder: "如：Instagram、Facebook", value: celebrityData.platform,
+                                                    onChange: (e) => setCelebrityData({...celebrityData, platform: e.target.value})
+                                                })
+                                            )
+                                        ),
+                                        React.createElement('div', { className: "space-y-2" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "社群文章內容"),
+                                            React.createElement('textarea', {
+                                                className: "input-field w-full p-4 h-48 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: "請輸入藝人發佈的原文內容...", value: celebrityData.content,
+                                                onChange: (e) => setCelebrityData({...celebrityData, content: e.target.value})
+                                            })
+                                        ),
+                                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                            React.createElement('div', { className: "space-y-2" },
+                                                React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "配圖描述 (選填)"),
+                                                React.createElement('input', {
+                                                    type: 'text', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                    placeholder: "如：穿著黑色禮服在紅毯上", value: celebrityData.imageDesc,
+                                                    onChange: (e) => setCelebrityData({...celebrityData, imageDesc: e.target.value})
+                                                })
+                                            ),
+                                            React.createElement('div', { className: "space-y-2" },
+                                                React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "原始社群連結 (選填)"),
+                                                React.createElement('input', {
+                                                    type: 'url', className: "input-field w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                    placeholder: "如：https://www.instagram.com/...", value: celebrityData.link,
+                                                    onChange: (e) => setCelebrityData({...celebrityData, link: e.target.value})
+                                                })
+                                            )
+                                        ),
+                                        React.createElement('div', { className: "space-y-2" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, "補充說明 (選填)"),
+                                            React.createElement('textarea', {
+                                                className: "input-field w-full p-3 h-24 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--secondary-orange)] transition-all",
+                                                placeholder: "如有其他相關資訊可在此補充...", value: celebrityData.notes,
+                                                onChange: (e) => setCelebrityData({...celebrityData, notes: e.target.value})
+                                            })
+                                        )
+                                    )
+                                )
+                            ),
 
-                    console.log(`[Frontend Debug] Received data:`, data);
+                            // 右側輸出區
+                            React.createElement('div', { className: "output-area p-6 rounded-xl" },
+                                React.createElement('div', { className: "space-y-4" },
+                                    React.createElement('div', { className: "space-y-2" },
+                                        React.createElement('div', { className: "flex items-center justify-between" },
+                                            React.createElement('label', { className: "text-sm font-semibold text-gray-700" }, content.outputLabel),
+                                            React.createElement('button', {
+                                                className: "flex items-center text-gray-600 hover:text-[var(--secondary-orange)] transition-colors disabled:opacity-50",
+                                                onClick: () => copyToClipboard(output),
+                                                disabled: !output || isLoading
+                                            }, React.createElement(ClipboardCopy, { className: "mr-2 h-4 w-4" }), "複製")
+                                        ),
+                                        React.createElement('div', {
+                                            className: "output-field w-full h-80 overflow-y-auto p-4 text-sm rounded-lg output-scroll",
+                                            dangerouslySetInnerHTML: { __html: output.replace(/\n/g, '<br />') }
+                                        })
+                                    ),
+                                    optimizedTitles && React.createElement('div', { className: "space-y-4 mt-8" },
+                                        React.createElement('label', { className: "text-lg font-bold text-[var(--text-dark)]" }, "優化後的標題建議"),
+                                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+                                            renderTitleCard("長標 (25-30 字)", optimizedTitles.長標),
+                                            renderTitleCard("短標 (15-20 字)", optimizedTitles.短標)
+                                        )
+                                    )
+                                )
+                            )
+                        ),
 
-                    const result = data.content;
-                    if (!result) {
-                        throw new Error("AI 返回的內容格式不正確，缺少 'content' 字段。");
-                    }
+                        // 啟動按鈕
+                        React.createElement('div', { className: "mt-8" },
+                            error && React.createElement('div', { className: "flex items-center p-3 bg-red-100 text-red-800 rounded-lg mb-4" },
+                                React.createElement(XCircle, { className: "h-5 w-5 mr-2" }),
+                                React.createElement('span', { className: "text-sm" }, error)
+                            ),
+                            React.createElement('button', {
+                                className: "w-full flex items-center justify-center p-4 font-semibold rounded-lg text-white submit-button hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
+                                onClick: handleSubmit,
+                                disabled: isLoading || (!inputContent.trim() && !newsLink.trim() && (activeTab !== 'social-to-news' || !celebrityData.content))
+                            },
+                                isLoading && React.createElement(Loader, { className: "mr-2 h-5 w-5 animate-spin" }),
+                                content.buttonText
+                            )
+                        )
+                    )
+                )
+            );
+        };
 
-                    let resultText = '';
-                    let historyType = '';
-
-                    if (apiEndpoint === '/generate-news') {
-                        resultText = result.generatedText;
-                        historyType = '新聞重點產出新聞';
-                    } else if (apiEndpoint === '/rewrite-url') {
-                        resultText = result.rewrittenText;
-                        historyType = '新聞連結改寫';
-                    } else if (apiEndpoint === '/translate-rewrite') {
-                        resultText = result.translatedRewrittenText;
-                        historyType = '外電新聞翻譯與改寫';
-                    } else if (apiEndpoint === '/rewrite-news-draft') {
-                        resultText = result.rewrittenNewsDraftText;
-                        historyType = '新聞稿改寫';
-                    } else if (apiEndpoint === '/celebrity-social-to-news') {
-                        resultText = result.celebrityNewsText;
-                        historyType = '名人社群文章轉新聞';
-                    } else if (apiEndpoint === '/generate-news-from-youtube') {
-                        resultText = result.newsContent;
-                        historyType = 'YouTube 連結轉新聞';
-                    } else if (apiEndpoint === '/proofread-text') {
-                        resultText = result.correctedText;
-                        historyType = '錯字校正與語法檢查';
-                    }
-
-                    if (outputField.id === 'correctedTextOutput') {
-                        outputField.innerHTML = formatProofreadText(resultText);
-                    } else if (typeof resultText === 'string') {
-                        outputField.value = unescapeHtml(resultText);
-                    } else {
-                        outputField.value = "錯誤：AI 返回內容格式不正確。原始響應: " + JSON.stringify(data, null, 2);
-                    }
-
-                    if (titlesOutputElement) {
-                        renderOptimizedTitles(titlesOutputElement, result.optimizedTitles);
-                    }
-
-                    history.unshift({
-                        type: historyType,
-                        content: data,
-                        timestamp: new Date().toISOString()
-                    });
-                    saveHistory();
-
-                } catch (error) {
-                    console.error('[Frontend Debug] 發生錯誤:', error);
-                    const errorMessage = `發生錯誤：${error.message}`;
-                    if (outputField.id === 'correctedTextOutput') {
-                        outputField.innerHTML = `<p style="color: red;">${errorMessage}</p>`;
-                    } else {
-                        outputField.value = errorMessage;
-                    }
-                    showModal(`操作失敗：${error.message}`);
-                } finally {
-                    button.disabled = false;
-                    button.innerHTML = originalButtonContent;
-                }
-            }
-
-            generateNewsBtn.addEventListener('click', () => {
-                const payload = {
-                    content: newsContent.value,
-                    title: newsTitle.value,
-                    minLength: parseInt(minLength.value) || 0,
-                    maxLength: parseInt(maxLength.value) || 0,
-                    numParagraphs: parseInt(numParagraphs.value) || 0,
-                    tone: toneSelect.value
-                };
-                if (!payload.content || payload.content.trim() === '') {
-                    showModal('新聞重點為必填項。');
-                    return;
-                }
-                handleAIRequest(generateNewsBtn, generatedNewsOutput, '/generate-news', payload,
-                    generatedNewsOptimizedTitles);
-            });
-
-            rewriteUrlBtn.addEventListener('click', () => {
-                const payload = { url: rewriteUrlInput.value };
-                if (!payload.url || payload.url.trim() === '') {
-                    showModal('新聞連結為必填項。');
-                    return;
-                }
-                handleAIRequest(rewriteUrlBtn, rewrittenUrlOutput, '/rewrite-url', payload,
-                    rewrittenUrlOptimizedTitles);
-            });
-
-            rewriteNewsDraftBtn.addEventListener('click', () => {
-                const payload = { 
-                    content: newsDraftInput.value,
-                    isBrandsFiltered: isBrandsFiltered.checked
-                };
-                if (!payload.content || payload.content.trim() === '') {
-                    showModal('新聞稿內容為必填項。');
-                    return;
-                }
-                handleAIRequest(rewriteNewsDraftBtn, rewrittenNewsDraftOutput, '/rewrite-news-draft', payload,
-                    rewrittenNewsDraftOptimizedTitles);
-            });
-
-            translateRewriteBtn.addEventListener('click', () => {
-                const payload = {
-                    url: foreignNewsUrlInput.value,
-                    sourceLanguage: sourceLanguageSelect.value
-                };
-                if (!payload.url || payload.url.trim() === '') {
-                    showModal('外電新聞連結為必填項。');
-                    return;
-                }
-                handleAIRequest(translateRewriteBtn, translatedRewrittenOutput, '/translate-rewrite', payload,
-                    translatedRewrittenOptimizedTitles);
-            });
-
-            generateSocialNewsBtn.addEventListener('click', () => {
-                const payload = {
-                    artistName: celebrityNameInput.value,
-                    platform: socialPlatformSelect.value,
-                    postContent: socialPostContent.value,
-                    mediaDescription: mediaDescriptionInput.value,
-                    originalLink: originalSocialLinkInput.value,
-                    remark: socialRemarkInput.value
-                };
-
-                if (!payload.artistName || payload.artistName.trim() === '' || !payload.postContent || payload.postContent.trim() === '') {
-                    showModal('藝人名稱和社群文章內容為必填項。');
-                    return;
-                }
-
-                handleAIRequest(generateSocialNewsBtn, generatedSocialNewsOutput, '/celebrity-social-to-news', payload,
-                    generatedSocialNewsOptimizedTitles);
-            });
-
-            generateYoutubeNewsBtn.addEventListener('click', () => {
-                const payload = { youtubeUrl: youtubeUrlInput.value };
-                if (!payload.youtubeUrl || payload.youtubeUrl.trim() === '') {
-                    showModal('請輸入 YouTube 影片連結。');
-                    return;
-                }
-                handleAIRequest(generateYoutubeNewsBtn, generatedYoutubeNewsOutput, '/generate-news-from-youtube', payload,
-                    generatedYoutubeNewsOptimizedTitles);
-            });
-
-            proofreadTextBtn.addEventListener('click', () => {
-                const payload = { text: proofreadTextInput.value };
-                if (!payload.text || payload.text.trim() === '') {
-                    showModal('輸入校正的文字為必填項。');
-                    return;
-                }
-                handleAIRequest(proofreadTextBtn, correctedTextOutput, '/proofread-text', payload,
-                    correctedTextOptimizedTitles);
-            });
-
-            document.querySelectorAll('.copy-button').forEach(button => {
-                button.addEventListener('click', (event) => {
-                    const targetId = event.target.dataset.target;
-                    const targetElement = document.getElementById(targetId);
-                    let textToCopy = '';
-
-                    if (targetElement.tagName === 'TEXTAREA') {
-                        textToCopy = targetElement.value;
-                    } else if (targetElement.tagName === 'DIV' && targetElement.classList.contains('corrected-text-display')) {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = targetElement.innerHTML;
-                        const spans = tempDiv.querySelectorAll('span.error-highlight');
-                        spans.forEach(span => {
-                            const nextSibling = span.nextSibling;
-                            if (nextSibling && nextSibling.nodeType === 3 && nextSibling.textContent.startsWith('（')) {
-                                const endParenIndex = nextSibling.textContent.indexOf('）');
-                                if (endParenIndex !== -1) {
-                                    nextSibling.textContent = nextSibling.textContent.substring(endParenIndex + 1);
-                                }
-                            }
-                            span.outerHTML = span.textContent;
-                        });
-                        textToCopy = tempDiv.textContent || tempDiv.innerText;
-                    }
-
-                    if (textToCopy) {
-                        const textarea = document.createElement('textarea');
-                        textarea.value = textToCopy;
-                        document.body.appendChild(textarea);
-                        textarea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textarea);
-                        showModal('內容已複製到剪貼簿！');
-                    } else {
-                        showModal('沒有內容可以複製。');
-                    }
-                });
-            });
-
-            document.querySelectorAll('.nav-menu-sidebar a').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    document.querySelectorAll('.nav-menu-sidebar a').forEach(link => {
-                        link.classList.remove('active');
-                    });
-                    this.classList.add('active');
-
-                    const targetId = this.getAttribute('href');
-                    const targetElement = document.querySelector(targetId);
-                    if (targetElement) {
-                        window.scrollTo({
-                            top: targetElement.offsetTop - 70,
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-            });
-
-            const sections = document.querySelectorAll('.tool-section');
-            const navLinks = document.querySelectorAll('.nav-menu-sidebar a');
-
-            const activateNavLink = () => {
-                let currentActiveLink = null;
-                const scrollPosition = window.scrollY;
-                const offset = 80;
-
-                sections.forEach(section => {
-                    const sectionTop = section.offsetTop - offset;
-                    const sectionBottom = sectionTop + section.offsetHeight;
-
-                    if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
-                        currentActiveLink = document.querySelector(`.nav-menu-sidebar a[href="#${section.id}"]`);
-                    }
-                });
-
-                navLinks.forEach(link => {
-                    link.classList.remove('active');
-                });
-
-                if (currentActiveLink) {
-                    currentActiveLink.classList.add('active');
-                } else {
-                    if (window.scrollY < sections[0].offsetTop - offset) {
-                        navLinks[0].classList.add('active');
-                    }
-                }
-            };
-
-            window.addEventListener('scroll', activateNavLink);
-            activateNavLink();
-
-            if (window.location.hash) {
-                const targetElement = document.querySelector(window.location.hash);
-                if (targetElement) {
-                    window.scrollTo({
-                        top: targetElement.offsetTop - 70,
-                        behavior: 'smooth'
-                    });
-                    const correspondingLink = document.querySelector(`.nav-menu-sidebar a[href="${window.location.hash}"]`);
-                    if (correspondingLink) {
-                        document.querySelectorAll('.nav-menu-sidebar a').forEach(link => link.classList.remove('active'));
-                        correspondingLink.classList.add('active');
-                    }
-                }
-            } else {
-                const firstLink = document.querySelector('.nav-menu-sidebar a');
-                if (firstLink) {
-                    firstLink.classList.add('active');
-                }
-            }
-        });
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
     </script>
 </body>
 </html>
