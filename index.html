@@ -929,12 +929,20 @@
                     numParagraphs: parseInt(numParagraphs.value) || 0,
                     tone: toneSelect.value
                 };
+                if (!payload.content || payload.content.trim() === '') {
+                    showModal('新聞重點為必填項。');
+                    return;
+                }
                 handleAIRequest(generateNewsBtn, generatedNewsOutput, '/generate-news', payload,
                     generatedNewsOptimizedTitles);
             });
 
             rewriteUrlBtn.addEventListener('click', () => {
                 const payload = { url: rewriteUrlInput.value };
+                if (!payload.url || payload.url.trim() === '') {
+                    showModal('新聞連結為必填項。');
+                    return;
+                }
                 handleAIRequest(rewriteUrlBtn, rewrittenUrlOutput, '/rewrite-url', payload,
                     rewrittenUrlOptimizedTitles);
             });
@@ -944,6 +952,10 @@
                     content: newsDraftInput.value,
                     isBrandsFiltered: isBrandsFiltered.checked
                 };
+                if (!payload.content || payload.content.trim() === '') {
+                    showModal('新聞稿內容為必填項。');
+                    return;
+                }
                 handleAIRequest(rewriteNewsDraftBtn, rewrittenNewsDraftOutput, '/rewrite-news-draft', payload,
                     rewrittenNewsDraftOptimizedTitles);
             });
@@ -953,6 +965,10 @@
                     url: foreignNewsUrlInput.value,
                     sourceLanguage: sourceLanguageSelect.value
                 };
+                if (!payload.url || payload.url.trim() === '') {
+                    showModal('外電新聞連結為必填項。');
+                    return;
+                }
                 handleAIRequest(translateRewriteBtn, translatedRewrittenOutput, '/translate-rewrite', payload,
                     translatedRewrittenOptimizedTitles);
             });
@@ -967,7 +983,7 @@
                     remark: socialRemarkInput.value
                 };
 
-                if (!payload.artistName || !payload.postContent) {
+                if (!payload.artistName || payload.artistName.trim() === '' || !payload.postContent || payload.postContent.trim() === '') {
                     showModal('藝人名稱和社群文章內容為必填項。');
                     return;
                 }
@@ -978,7 +994,7 @@
 
             generateYoutubeNewsBtn.addEventListener('click', () => {
                 const payload = { youtubeUrl: youtubeUrlInput.value };
-                if (!payload.youtubeUrl) {
+                if (!payload.youtubeUrl || payload.youtubeUrl.trim() === '') {
                     showModal('請輸入 YouTube 影片連結。');
                     return;
                 }
@@ -988,6 +1004,10 @@
 
             proofreadTextBtn.addEventListener('click', () => {
                 const payload = { text: proofreadTextInput.value };
+                if (!payload.text || payload.text.trim() === '') {
+                    showModal('輸入校正的文字為必填項。');
+                    return;
+                }
                 handleAIRequest(proofreadTextBtn, correctedTextOutput, '/proofread-text', payload,
                     correctedTextOptimizedTitles);
             });
