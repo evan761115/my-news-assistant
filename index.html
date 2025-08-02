@@ -816,8 +816,11 @@
                 const fullUrl = `${backendUrl}${apiEndpoint}`;
 
                 button.disabled = true;
+                const originalButtonContent = button.innerHTML;
+                button.innerHTML = '<div class="loading-spinner"></div>';
+
                 if (outputField.id === 'correctedTextOutput') {
-                    outputField.innerHTML = '<div class="loading-spinner"></div><p style="color: #666; margin-top: 1rem;">AI 正在努力生成中，請稍候...</p>';
+                    outputField.innerHTML = '<p style="color: #666; margin-top: 1rem;">AI 正在努力生成中，請稍候...</p>';
                 } else {
                     outputField.value = 'AI 正在努力生成中，請稍候...';
                 }
@@ -917,6 +920,7 @@
                     showModal(`操作失敗：${error.message}`);
                 } finally {
                     button.disabled = false;
+                    button.innerHTML = originalButtonContent;
                 }
             }
 
